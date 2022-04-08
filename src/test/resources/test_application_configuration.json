@@ -3,12 +3,25 @@
       {
          "id": "DmaapInformationType",
          "dmaapTopicUrl": "/dmaap-topic-1",
-         "useHttpProxy": false
+         "useHttpProxy": false,
+         "dataType": "text"
       },
       {
          "id": "KafkaInformationType",
          "kafkaInputTopic": "TutorialTopic",
-         "useHttpProxy": false
+         "useHttpProxy": false       
+      },
+      {
+         "id": "PmInformationType",
+         "dmaapTopicUrl": "/dmaap-topic-2",
+         "useHttpProxy": false,
+         "dataType": "PmData"
+      },
+      {
+         "id": "PmInformationTypeKafka",
+         "kafkaInputTopic": "TutorialTopic",
+         "useHttpProxy": false,
+         "dataType": "PmData"
       }
    ]
 }

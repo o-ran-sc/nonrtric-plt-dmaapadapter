@@ -20,6 +20,7 @@
 
 package org.oran.dmaapadapter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -29,7 +30,9 @@ import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.json.JSONObject;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
+import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.r1.ConsumerJobInfo;
 import org.oran.dmaapadapter.r1.ProducerInfoTypeInfo;
 import org.oran.dmaapadapter.r1.ProducerJobInfo;
@@ -99,13 +102,33 @@ public class IcsSimulatorController {
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
-    public void addJob(ConsumerJobInfo job, String jobId, AsyncRestClient restClient) {
+    public void addJob(ConsumerJobInfo job, String jobId, AsyncRestClient restClient) throws ServiceException {
         String url = this.testResults.registrationInfo.jobCallbackUrl;
         ProducerJobInfo request =
                 new ProducerJobInfo(job.jobDefinition, jobId, job.infoTypeId, job.jobResultUri, job.owner, "TIMESTAMP");
         String body = gson.toJson(request);
+        validateJsonObjectAgainstSchema(job.jobDefinition, testResults.types.get(job.infoTypeId).jobDataSchema);
         logger.info("ICS Simulator PUT job: {}", body);
         restClient.post(url, body, MediaType.APPLICATION_JSON).block();
+    }
+
+    private void validateJsonObjectAgainstSchema(Object object, Object schemaObj) throws ServiceException {
+        if (schemaObj != null) { // schema is optional for now
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+
+                String schemaAsString = mapper.writeValueAsString(schemaObj);
+                JSONObject schemaJSON = new JSONObject(schemaAsString);
+                var schema = org.everit.json.schema.loader.SchemaLoader.load(schemaJSON);
+
+                String objectAsString = object.toString();
+                JSONObject json = new JSONObject(objectAsString);
+                schema.validate(json);
+            } catch (Exception e) {
+                logger.error("Json validation failure {}", e.toString());
+                throw new ServiceException("Json validation failure " + e.toString(), HttpStatus.BAD_REQUEST);
+            }
+        }
     }
 
     public void deleteJob(String jobId, AsyncRestClient restClient) {

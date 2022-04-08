@@ -108,7 +108,8 @@ public class KafkaJobDataConsumer {
     }
 
     private Flux<String> getMessagesFromKafka(Flux<String> input, Job job) {
-        Flux<String> result = input.filter(job::isFilterMatch);
+        Flux<String> result = input.map(job::filter) //
+                .filter(t -> !t.isEmpty()); //
 
         if (job.isBuffered()) {
             result = result.map(this::quote) //
