@@ -334,6 +334,21 @@ paths:
             '*/*':
               schema:
                 type: object
+  /dmaap-topic-2:
+    get:
+      tags:
+      - DMAAP Simulator (exists only in test)
+      summary: GET from topic
+      description: The call is invoked to activate or to modify a data subscription.
+        The endpoint is provided by the Information Producer.
+      operationId: getFromPmTopic
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/void'
   /consumer:
     post:
       tags:
