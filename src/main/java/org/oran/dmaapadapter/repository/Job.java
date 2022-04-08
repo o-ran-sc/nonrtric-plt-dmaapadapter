@@ -20,14 +20,17 @@
 
 package org.oran.dmaapadapter.repository;
 
+import com.google.common.base.Strings;
+
 import java.time.Duration;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import lombok.Getter;
 
 import org.immutables.gson.Gson;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
+import org.oran.dmaapadapter.repository.filters.Filter;
+import org.oran.dmaapadapter.repository.filters.PmReportFilter;
+import org.oran.dmaapadapter.repository.filters.RegexpFilter;
 
 public class Job {
 
@@ -38,18 +41,23 @@ public class Job {
         @Getter
         private BufferTimeout bufferTimeout;
 
-        private int maxConcurrency;
+        private Integer maxConcurrency;
+
+        @Getter
+        private PmReportFilter.FilterData pmFilter;
 
         public Parameters() {}
 
-        public Parameters(String filter, BufferTimeout bufferTimeout, int maxConcurrency) {
+        public Parameters(String filter, BufferTimeout bufferTimeout, Integer maxConcurrency,
+                PmReportFilter.FilterData pmFilter) {
             this.filter = filter;
             this.bufferTimeout = bufferTimeout;
             this.maxConcurrency = maxConcurrency;
+            this.pmFilter = pmFilter;
         }
 
         public int getMaxConcurrency() {
-            return maxConcurrency == 0 ? 1 : maxConcurrency;
+            return maxConcurrency == null || maxConcurrency == 0 ? 1 : maxConcurrency;
         }
     }
 
@@ -90,7 +98,7 @@ public class Job {
     @Getter
     private final String lastUpdated;
 
-    private final Pattern jobDataFilter;
+    private final Filter filter;
 
     @Getter
     private final AsyncRestClient consumerRestClient;
@@ -103,20 +111,22 @@ public class Job {
         this.owner = owner;
         this.lastUpdated = lastUpdated;
         this.parameters = parameters;
-        if (parameters != null && parameters.filter != null) {
-            jobDataFilter = Pattern.compile(parameters.filter);
+        if (parameters != null && !Strings.isNullOrEmpty(parameters.filter)) {
+            filter = new RegexpFilter(parameters.filter);
+        } else if (parameters != null && parameters.pmFilter != null) {
+            filter = new PmReportFilter(parameters.pmFilter);
         } else {
-            jobDataFilter = null;
+            filter = null;
         }
         this.consumerRestClient = consumerRestClient;
+
     }
 
-    public boolean isFilterMatch(String data) {
-        if (jobDataFilter == null) {
-            return true;
+    public String filter(String data) {
+        if (filter == null) {
+            return data;
         }
-        Matcher matcher = jobDataFilter.matcher(data);
-        return matcher.find();
+        return filter.filter(data);
     }
 
     public boolean isBuffered() {

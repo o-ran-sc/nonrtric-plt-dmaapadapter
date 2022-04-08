@@ -33,6 +33,7 @@ import org.springframework.http.MediaType;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuples;
 
 /**
  * The class fetches incoming requests from DMAAP and sends them further to the
@@ -99,9 +100,11 @@ public class DmaapTopicConsumer {
 
         // Distibute the body to all jobs for this type
         return Flux.fromIterable(this.jobs.getJobsForType(this.type)) //
-                .filter(job -> job.isFilterMatch(body)) //
-                .doOnNext(job -> logger.debug("Sending to consumer {}", job.getCallbackUrl())) //
-                .flatMap(job -> job.getConsumerRestClient().post("", body, MediaType.APPLICATION_JSON), CONCURRENCY) //
+                .map(job -> Tuples.of(job, job.filter(body))) //
+                .filter(t -> !t.getT2().isEmpty()) //
+                .doOnNext(touple -> logger.debug("Sending to consumer {}", touple.getT1().getCallbackUrl())) //
+                .flatMap(touple -> touple.getT1().getConsumerRestClient().post("", touple.getT2(),
+                        MediaType.APPLICATION_JSON), CONCURRENCY) //
                 .onErrorResume(this::handleConsumerErrorResponse);
     }
 }

@@ -340,6 +340,16 @@
             }},
             "tags": ["Actuator"]
         }},
+        "/dmaap-topic-2": {"get": {
+            "summary": "GET from topic",
+            "description": "The call is invoked to activate or to modify a data subscription. The endpoint is provided by the Information Producer.",
+            "operationId": "getFromPmTopic",
+            "responses": {"200": {
+                "description": "OK",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/void"}}}
+            }},
+            "tags": ["DMAAP Simulator (exists only in test)"]
+        }},
         "/consumer": {"post": {
             "summary": "Consume data",
             "requestBody": {

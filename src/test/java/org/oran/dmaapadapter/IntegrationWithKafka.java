@@ -186,7 +186,7 @@ class IntegrationWithKafka {
     private static Object jobParametersAsJsonObject(String filter, long maxTimeMiliseconds, int maxSize,
             int maxConcurrency) {
         Job.Parameters param =
-                new Job.Parameters(filter, new Job.BufferTimeout(maxSize, maxTimeMiliseconds), maxConcurrency);
+                new Job.Parameters(filter, new Job.BufferTimeout(maxSize, maxTimeMiliseconds), maxConcurrency, null);
         String str = gson.toJson(param);
         return jsonObject(str);
     }
@@ -254,7 +254,7 @@ class IntegrationWithKafka {
     }
 
     @Test
-    void simpleCase() throws InterruptedException {
+    void simpleCase() throws Exception {
         final String JOB_ID = "ID";
 
         // Register producer, Register types
@@ -307,7 +307,7 @@ class IntegrationWithKafka {
     }
 
     @Test
-    void kafkaIOverflow() throws InterruptedException {
+    void kafkaIOverflow() throws Exception {
         final String JOB_ID1 = "ID1";
         final String JOB_ID2 = "ID2";
 

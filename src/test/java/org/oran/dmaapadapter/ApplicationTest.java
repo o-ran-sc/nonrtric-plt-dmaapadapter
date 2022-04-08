@@ -29,7 +29,9 @@ import com.google.gson.JsonParser;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import org.json.JSONObject;
@@ -50,6 +52,7 @@ import org.oran.dmaapadapter.r1.ProducerJobInfo;
 import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
+import org.oran.dmaapadapter.repository.filters.PmReportFilter;
 import org.oran.dmaapadapter.tasks.KafkaJobDataConsumer;
 import org.oran.dmaapadapter.tasks.KafkaTopicConsumers;
 import org.oran.dmaapadapter.tasks.ProducerRegstrationTask;
@@ -194,6 +197,10 @@ class ApplicationTest {
         return consumerJobInfo("DmaapInformationType", "EI_JOB_ID");
     }
 
+    private ConsumerJobInfo consumerPmJobInfo() {
+        return consumerJobInfo("PmInformationType", "EI_PM_JOB_ID");
+    }
+
     private Object jsonObject() {
         return jsonObject("{}");
     }
@@ -248,14 +255,14 @@ class ApplicationTest {
     }
 
     @Test
-    void testReceiveAndPostDataFromKafka() {
+    void testReceiveAndPostDataFromKafka() throws Exception {
         final String JOB_ID = "ID";
         final String TYPE_ID = "KafkaInformationType";
         await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         // Create a job
-        Job.Parameters param = new Job.Parameters("", new Job.BufferTimeout(123, 456), 1);
+        Job.Parameters param = new Job.Parameters("", new Job.BufferTimeout(123, 456), 1, null);
         String targetUri = baseUrl() + ConsumerController.CONSUMER_TARGET_URL;
         ConsumerJobInfo kafkaJobInfo =
                 new ConsumerJobInfo(TYPE_ID, jsonObject(gson.toJson(param)), "owner", targetUri, "");
@@ -318,6 +325,72 @@ class ApplicationTest {
     }
 
     @Test
+    void testPmFiltering() throws Exception {
+        // Create a job
+        final String JOB_ID = "ID";
+
+        // Register producer, Register types
+        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
+        producerRegistrationTask.supervisionTask().block();
+
+        // Create a job with a PM filter
+        ConsumerJobInfo jobInfo = consumerPmJobInfo();
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        filterData.getMeasTypes().add("succImmediateAssignProcs");
+        filterData.getMeasObjInstIds().add("UtranCell=Gbg-997");
+        filterData.getSourceNames().add("O-DU-1122");
+        filterData.getMeasuredEntityDns().add("ManagedElement=RNC-Gbg-1");
+        Job.Parameters param = new Job.Parameters(null, null, null, filterData);
+        String paramJson = gson.toJson(param);
+        jobInfo.jobDefinition = jsonObject(paramJson);
+
+        this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+
+        // Return one messagefrom DMAAP and verify that the job (consumer) receives a
+        // filtered PM message
+        String path = "./src/test/resources/pm_report.json";
+        String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
+        DmaapSimulatorController.dmaapPmResponses.add(pmReportJson);
+
+        ConsumerController.TestResults consumer = this.consumerController.testResults;
+        await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
+        String receivedFiltered = consumer.receivedBodies.get(0);
+        assertThat(receivedFiltered).contains("succImmediateAssignProcs").doesNotContain("\"p\":2").contains("\"p\":1");
+
+        // Delete the job
+        this.icsSimulatorController.deleteJob(JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
+    }
+
+    @Test
+    void testPmFilteringKafka() throws Exception {
+        // Test that the schema for kafka and pm filtering is OK.
+
+        // Create a job
+        final String JOB_ID = "ID";
+
+        // Register producer, Register types
+        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
+        producerRegistrationTask.supervisionTask().block();
+
+        // Create a job with a PM filter
+        ConsumerJobInfo jobInfo = consumerPmJobInfo();
+        jobInfo.infoTypeId = "PmInformationTypeKafka";
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        filterData.getMeasTypes().add("succImmediateAssignProcs");
+        Job.Parameters param = new Job.Parameters(null, null, null, filterData);
+        String paramJson = gson.toJson(param);
+        jobInfo.jobDefinition = jsonObject(paramJson);
+        this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+
+        // Delete the job
+        this.icsSimulatorController.deleteJob(JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
+    }
+
+    @Test
     void testReRegister() throws Exception {
         // Wait foir register types and producer
         await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
@@ -330,8 +403,8 @@ class ApplicationTest {
 
         // Just clear the registerred types, should trigger a re-register
         icsSimulatorController.testResults.types.clear();
-        await().untilAsserted(
-                () -> assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(2));
+        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds)
+                .hasSize(this.types.size()));
     }
 
     public static void testErrorCode(Mono<?> request, HttpStatus expStatus, String responseContains) {

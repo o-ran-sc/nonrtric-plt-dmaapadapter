@@ -38,11 +38,14 @@ public class InfoType {
     @Getter
     private final String kafkaInputTopic;
 
-    public InfoType(String id, String dmaapTopicUrl, boolean useHttpProxy, String kafkaInputTopic) {
+    private final String dataType;
+
+    public InfoType(String id, String dmaapTopicUrl, boolean useHttpProxy, String kafkaInputTopic, String dataType) {
         this.id = id;
         this.dmaapTopicUrl = dmaapTopicUrl;
         this.useHttpProxy = useHttpProxy;
         this.kafkaInputTopic = kafkaInputTopic;
+        this.dataType = dataType;
     }
 
     public boolean isKafkaTopicDefined() {
@@ -53,4 +56,14 @@ public class InfoType {
         return StringUtils.hasLength(dmaapTopicUrl);
     }
 
+    public enum DataType {
+        PM_DATA, TEXT
+    }
+
+    public DataType getDataType() {
+        if (dataType != null && dataType.equalsIgnoreCase("pmData")) {
+            return DataType.PM_DATA;
+        }
+        return DataType.TEXT;
+    }
 }
