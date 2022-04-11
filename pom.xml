@@ -304,7 +304,7 @@
                             <pullRegistry>${env.CONTAINER_PULL_REGISTRY}</pullRegistry>
                             <images>
                                 <image>
-                                    <name>o-ran-sc/nonrtric-nonrtric-plt-dmaapadapter:${project.version}</name>
+                                    <name>o-ran-sc/nonrtric-plt-dmaapadapter:${project.version}</name>
                                     <build>
                                         <cleanup>try</cleanup>
                                         <contextDir>${basedir}</contextDir>
@@ -331,7 +331,7 @@
                             <pushRegistry>${env.CONTAINER_PUSH_REGISTRY}</pushRegistry>
                             <images>
                                 <image>
-                                    <name>o-ran-sc/nonrtric-nonrtric-plt-dmaapadapter:${project.version}</name>
+                                    <name>o-ran-sc/nonrtric-plt-dmaapadapter:${project.version}</name>
                                     <build>
                                         <contextDir>${basedir}</contextDir>
                                         <dockerFile>Dockerfile</dockerFile>
