@@ -2,8 +2,8 @@
 .. SPDX-License-Identifier: CC-BY-4.0
 .. Copyright (C) 2021 Nordix
 
-Non-RT RIC
-==========
+Non-RT RIC DMaaP Adapter
+========================
 
 .. toctree::
    :maxdepth: 2
