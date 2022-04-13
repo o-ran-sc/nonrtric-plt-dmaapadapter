@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f0e4a45e_14ff1ebb",
+        "filename": "src/main/java/org/oran/dmaapadapter/repository/filters/PmReportFilter.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 1001589
+      },
+      "writtenOn": "2022-04-13T07:45:07Z",
+      "side": 1,
+      "message": "trailing space, not sure if this matters",
+      "range": {
+        "startLine": 78,
+        "startChar": 6,
+        "endLine": 78,
+        "endChar": 7
+      },
+      "revId": "076486cad33eff7d14a7b702ad89d5e3212bf8e2",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    }
+  ]
+}
