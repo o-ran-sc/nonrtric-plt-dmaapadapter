@@ -49,8 +49,11 @@ public class DmaapSimulatorController {
     private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     public static final String DMAAP_TOPIC_URL = "/dmaap-topic-1";
+    public static final String DMAAP_TOPIC_PM_URL = "/dmaap-topic-2";
 
     public static List<String> dmaapResponses = Collections.synchronizedList(new LinkedList<String>());
+
+    public static List<String> dmaapPmResponses = Collections.synchronizedList(new LinkedList<String>());
 
     @GetMapping(path = DMAAP_TOPIC_URL, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "GET from topic",
@@ -65,6 +68,23 @@ public class DmaapSimulatorController {
         } else {
             String resp = dmaapResponses.remove(0);
             logger.info("DMAAP simulator returned: {}", resp);
+            return new ResponseEntity<>(resp, HttpStatus.OK);
+        }
+
+    }
+
+    @GetMapping(path = DMAAP_TOPIC_PM_URL, produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "GET from topic",
+            description = "The call is invoked to activate or to modify a data subscription. The endpoint is provided by the Information Producer.")
+    @ApiResponses(value = { //
+            @ApiResponse(responseCode = "200", description = "OK", //
+                    content = @Content(schema = @Schema(implementation = VoidResponse.class))) //
+    })
+    public ResponseEntity<Object> getFromPmTopic() {
+        if (dmaapPmResponses.isEmpty()) {
+            return ErrorResponse.create("", HttpStatus.NOT_FOUND);
+        } else {
+            String resp = dmaapPmResponses.remove(0);
             return new ResponseEntity<>(resp, HttpStatus.OK);
         }
 

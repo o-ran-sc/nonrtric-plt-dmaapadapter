@@ -149,7 +149,12 @@ public class ProducerRegstrationTask {
     }
 
     private Object jsonSchemaObject(InfoType type) throws IOException, ServiceException {
-        String schemaFile = type.isKafkaTopicDefined() ? "/typeSchemaKafka.json" : "/typeSchemaDmaap.json";
+        String schemaFile;
+        if (type.getDataType() == InfoType.DataType.PM_DATA) {
+            schemaFile = type.isKafkaTopicDefined() ? "/typeSchemaPmDataKafka.json" : "/typeSchemaPmDataDmaap.json";
+        } else {
+            schemaFile = type.isKafkaTopicDefined() ? "/typeSchemaKafka.json" : "/typeSchemaDmaap.json";
+        }
         return jsonObject(readSchemaFile(schemaFile));
     }
 
