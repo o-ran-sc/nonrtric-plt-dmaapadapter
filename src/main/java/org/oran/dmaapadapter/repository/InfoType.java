@@ -57,13 +57,18 @@ public class InfoType {
     }
 
     public enum DataType {
-        PM_DATA, TEXT
+        PM_DATA, OTHER
     }
 
     public DataType getDataType() {
-        if (dataType != null && dataType.equalsIgnoreCase("pmData")) {
+        if (dataType == null) {
+            return DataType.OTHER;
+        }
+
+        if (dataType.equalsIgnoreCase("pmData")) {
             return DataType.PM_DATA;
         }
-        return DataType.TEXT;
+        return DataType.OTHER;
+
     }
 }
