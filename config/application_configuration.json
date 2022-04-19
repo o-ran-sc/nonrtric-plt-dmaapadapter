@@ -9,6 +9,12 @@
          "id": "ExampleInformationType2",
          "kafkaInputTopic": "TutorialTopic",
          "useHttpProxy": false
-      }
+      },
+       {
+         "id": "PmData",
+         "dmaapTopicUrl": "/events/PM_NOTIFICATION_OUTPUT/OpenDcae-c12/C12",
+         "useHttpProxy": true,
+         "dataType" : "pmData"
+      },
    ]
 }

@@ -3,43 +3,59 @@
    "type": "object",
    "additionalProperties": false,
    "properties": {
-      "pmFilter": {
-         "type": "object",
-         "additionalProperties": false,
-         "properties": {
-            "sourceNames": {
-               "type": "array",
-               "items": [
-                  {
-                     "type": "string"
-                  }
-               ]
+      "filter": {
+         "anyOf": [
+            {
+               "type": "string"
             },
-            "measObjInstIds": {
-               "type": "array",
-               "items": [
-                  {
-                     "type": "string"
+            {
+               "type": "object",
+               "additionalProperties": false,
+               "properties": {
+                  "sourceNames": {
+                     "type": "array",
+                     "items": [
+                        {
+                           "type": "string"
+                        }
+                     ]
+                  },
+                  "measObjInstIds": {
+                     "type": "array",
+                     "items": [
+                        {
+                           "type": "string"
+                        }
+                     ]
+                  },
+                  "measTypes": {
+                     "type": "array",
+                     "items": [
+                        {
+                           "type": "string"
+                        }
+                     ]
+                  },
+                  "measuredEntityDns": {
+                     "type": "array",
+                     "items": [
+                        {
+                           "type": "string"
+                        }
+                     ]
                   }
-               ]
-            },
-            "measTypes": {
-               "type": "array",
-               "items": [
-                  {
-                     "type": "string"
-                  }
-               ]
-            },
-            "measuredEntityDns": {
-               "type": "array",
-               "items": [
-                  {
-                     "type": "string"
-                  }
-               ]
+               }
             }
-         }
+         ]
+      },
+      "filterType": {
+         "type": "string",
+         "enum": [
+            "jslt",
+            "regexp",
+            "pmdata",
+            "json-path"
+         ]
       }
    }
 }

@@ -185,8 +185,8 @@ class IntegrationWithKafka {
 
     private static Object jobParametersAsJsonObject(String filter, long maxTimeMiliseconds, int maxSize,
             int maxConcurrency) {
-        Job.Parameters param =
-                new Job.Parameters(filter, new Job.BufferTimeout(maxSize, maxTimeMiliseconds), maxConcurrency, null);
+        Job.Parameters param = new Job.Parameters(filter, Job.Parameters.REGEXP_TYPE,
+                new Job.BufferTimeout(maxSize, maxTimeMiliseconds), maxConcurrency);
         String str = gson.toJson(param);
         return jsonObject(str);
     }

@@ -20,36 +20,33 @@
 
 package org.oran.dmaapadapter.repository.filters;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.jayway.jsonpath.JsonPath;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class RegexpFilter implements Filter {
-    private static final Logger logger = LoggerFactory.getLogger(RegexpFilter.class);
-    private Pattern regexp;
+public class JsonPathFilter implements Filter {
 
-    public RegexpFilter(String exp) {
+    private String expression;
+    private static final Logger logger = LoggerFactory.getLogger(JsonPathFilter.class);
+    com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+
+    public JsonPathFilter(String exp) {
         try {
-            regexp = Pattern.compile(exp);
+            expression = exp;
         } catch (Exception e) {
-            logger.warn("Could not parse REGEXP expression: {}, reason: {}", exp, e.getMessage());
+            logger.warn("Could not parse Json Path expression: {}, reason: {}", exp, e.getMessage());
         }
     }
 
     @Override
-    public String filter(String data) {
-        if (regexp == null) {
-            return data;
-        }
-        Matcher matcher = regexp.matcher(data);
-        boolean match = matcher.find();
-        if (match) {
-            return data;
-        } else {
+    public String filter(String jsonString) {
+        try {
+            Object o = JsonPath.parse(jsonString).read(this.expression, Object.class);
+            return o == null ? "" : gson.toJson(o);
+        } catch (Exception e) {
             return "";
         }
-    }
 
+    }
 }

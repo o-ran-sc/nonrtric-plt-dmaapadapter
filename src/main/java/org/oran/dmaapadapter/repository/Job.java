@@ -20,44 +20,85 @@
 
 package org.oran.dmaapadapter.repository;
 
-import com.google.common.base.Strings;
+import com.google.gson.GsonBuilder;
 
+import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import org.immutables.gson.Gson;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.repository.filters.Filter;
+import org.oran.dmaapadapter.repository.filters.JsltFilter;
+import org.oran.dmaapadapter.repository.filters.JsonPathFilter;
 import org.oran.dmaapadapter.repository.filters.PmReportFilter;
 import org.oran.dmaapadapter.repository.filters.RegexpFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Job {
 
+    private static com.google.gson.Gson gson = new GsonBuilder().create();
+    private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
     @Gson.TypeAdapters
     public static class Parameters {
-        @Getter
-        private String filter;
+        public static final String REGEXP_TYPE = "regexp";
+        public static final String PM_FILTER_TYPE = "pmdata";
+        public static final String JSLT_FILTER_TYPE = "jslt";
+        public static final String JSON_PATH_FILTER_TYPE = "json-path";
+
+        @Setter
+        private String filterType = REGEXP_TYPE;
+        private Object filter;
         @Getter
         private BufferTimeout bufferTimeout;
 
         private Integer maxConcurrency;
 
-        @Getter
-        private PmReportFilter.FilterData pmFilter;
-
         public Parameters() {}
 
-        public Parameters(String filter, BufferTimeout bufferTimeout, Integer maxConcurrency,
-                PmReportFilter.FilterData pmFilter) {
+        public Parameters(Object filter, String filterType, BufferTimeout bufferTimeout, Integer maxConcurrency) {
             this.filter = filter;
             this.bufferTimeout = bufferTimeout;
             this.maxConcurrency = maxConcurrency;
-            this.pmFilter = pmFilter;
+            this.filterType = filterType;
         }
 
         public int getMaxConcurrency() {
             return maxConcurrency == null || maxConcurrency == 0 ? 1 : maxConcurrency;
+        }
+
+        public String getFilterAsString() {
+            return this.filter.toString();
+        }
+
+        public PmReportFilter.FilterData getPmFilter() {
+            String str = gson.toJson(this.filter);
+            return gson.fromJson(str, PmReportFilter.FilterData.class);
+        }
+
+        public enum FilterType {
+            REGEXP, JSLT, JSON_PATH, PM_DATA, NONE
+        }
+
+        public FilterType getFilterType() {
+            if (filter == null || filterType == null) {
+                return FilterType.NONE;
+            } else if (filterType.equalsIgnoreCase(JSLT_FILTER_TYPE)) {
+                return FilterType.JSLT;
+            } else if (filterType.equalsIgnoreCase(JSON_PATH_FILTER_TYPE)) {
+                return FilterType.JSON_PATH;
+            } else if (filterType.equalsIgnoreCase(REGEXP_TYPE)) {
+                return FilterType.REGEXP;
+            } else if (filterType.equalsIgnoreCase(PM_FILTER_TYPE)) {
+                return FilterType.PM_DATA;
+            } else {
+                logger.warn("Unsupported filter type: {}", this.filterType);
+                return FilterType.NONE;
+            }
         }
     }
 
@@ -111,15 +152,32 @@ public class Job {
         this.owner = owner;
         this.lastUpdated = lastUpdated;
         this.parameters = parameters;
-        if (parameters != null && !Strings.isNullOrEmpty(parameters.filter)) {
-            filter = new RegexpFilter(parameters.filter);
-        } else if (parameters != null && parameters.pmFilter != null) {
-            filter = new PmReportFilter(parameters.pmFilter);
-        } else {
-            filter = null;
-        }
+        filter = createFilter(parameters);
         this.consumerRestClient = consumerRestClient;
 
+    }
+
+    private static Filter createFilter(Parameters parameters) {
+
+        if (parameters.filter == null) {
+            return null;
+        }
+
+        switch (parameters.getFilterType()) {
+            case PM_DATA:
+                return new PmReportFilter(parameters.getPmFilter());
+            case REGEXP:
+                return new RegexpFilter(parameters.getFilterAsString());
+            case JSLT:
+                return new JsltFilter(parameters.getFilterAsString());
+            case JSON_PATH:
+                return new JsonPathFilter(parameters.getFilterAsString());
+            case NONE:
+                return null;
+            default:
+                logger.error("Not handeled filter type: {}", parameters.getFilterType());
+                return null;
+        }
     }
 
     public String filter(String data) {

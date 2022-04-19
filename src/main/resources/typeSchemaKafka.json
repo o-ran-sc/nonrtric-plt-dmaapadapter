@@ -5,6 +5,14 @@
     "filter": {
       "type": "string"
     },
+    "filterType": {
+      "type": "string",
+      "enum": [
+        "jslt",
+        "regexp",
+        "json-path"
+      ]
+    },
     "maxConcurrency": {
       "type": "integer",
       "minimum": 1

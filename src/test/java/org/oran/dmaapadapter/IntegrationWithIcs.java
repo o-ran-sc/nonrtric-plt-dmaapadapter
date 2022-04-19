@@ -214,7 +214,8 @@ class IntegrationWithIcs {
         await().untilAsserted(() -> assertThat(producerRegstrationTask.isRegisteredInIcs()).isTrue());
         final String TYPE_ID = "KafkaInformationType";
 
-        Job.Parameters param = new Job.Parameters("filter", new Job.BufferTimeout(123, 456), 1, null);
+        Job.Parameters param =
+                new Job.Parameters("filter", Job.Parameters.REGEXP_TYPE, new Job.BufferTimeout(123, 456), 1);
 
         ConsumerJobInfo jobInfo =
                 new ConsumerJobInfo(TYPE_ID, jsonObject(gson.toJson(param)), "owner", consumerUri(), "");
@@ -233,7 +234,8 @@ class IntegrationWithIcs {
         await().untilAsserted(() -> assertThat(producerRegstrationTask.isRegisteredInIcs()).isTrue());
         final String TYPE_ID = "KafkaInformationType";
 
-        Job.Parameters param = new Job.Parameters("filter", new Job.BufferTimeout(123, 170 * 1000), 1, null);
+        Job.Parameters param =
+                new Job.Parameters("filter", Job.Parameters.REGEXP_TYPE, new Job.BufferTimeout(123, 170 * 1000), 1);
 
         ConsumerJobInfo jobInfo =
                 new ConsumerJobInfo(TYPE_ID, jsonObject(gson.toJson(param)), "owner", consumerUri(), "");
