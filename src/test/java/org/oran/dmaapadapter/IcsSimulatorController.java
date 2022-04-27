@@ -20,6 +20,8 @@
 
 package org.oran.dmaapadapter;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -27,6 +29,7 @@ import com.google.gson.GsonBuilder;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.lang.invoke.MethodHandles;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -58,12 +61,12 @@ public class IcsSimulatorController {
     public static class TestResults {
 
         ProducerRegistrationInfo registrationInfo = null;
-        Map<String, ProducerInfoTypeInfo> types = new HashMap<>();
+        Map<String, ProducerInfoTypeInfo> types = Collections.synchronizedMap(new HashMap<>());
         String infoProducerId = null;
 
         public TestResults() {}
 
-        public void reset() {
+        public synchronized void reset() {
             registrationInfo = null;
             types.clear();
             infoProducerId = null;
@@ -107,7 +110,12 @@ public class IcsSimulatorController {
         ProducerJobInfo request =
                 new ProducerJobInfo(job.jobDefinition, jobId, job.infoTypeId, job.jobResultUri, job.owner, "TIMESTAMP");
         String body = gson.toJson(request);
-        validateJsonObjectAgainstSchema(job.jobDefinition, testResults.types.get(job.infoTypeId).jobDataSchema);
+        ProducerInfoTypeInfo type = testResults.types.get(job.infoTypeId);
+        if (type == null) {
+            logger.error("type not found: {} size: {}", job.infoTypeId, testResults.types.size());
+        }
+        assertThat(type).isNotNull();
+        validateJsonObjectAgainstSchema(job.jobDefinition, type.jobDataSchema);
         logger.info("ICS Simulator PUT job: {}", body);
         restClient.post(url, body, MediaType.APPLICATION_JSON).block();
     }
