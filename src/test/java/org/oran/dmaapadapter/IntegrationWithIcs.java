@@ -27,6 +27,10 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
 
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +45,8 @@ import org.oran.dmaapadapter.r1.ConsumerJobInfo;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
 import org.oran.dmaapadapter.tasks.ProducerRegstrationTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -65,6 +71,7 @@ class IntegrationWithIcs {
 
     private static final String DMAAP_JOB_ID = "DMAAP_JOB_ID";
     private static final String DMAAP_TYPE_ID = "DmaapInformationType";
+    private static final Logger logger = LoggerFactory.getLogger(Application.class);
 
     @Autowired
     private ApplicationConfig applicationConfig;
@@ -166,17 +173,21 @@ class IntegrationWithIcs {
     }
 
     private void createInformationJobInIcs(String typeId, String jobId, String filter) {
-        String body = gson.toJson(consumerJobInfo(typeId, filter));
-        try {
-            // Delete the job if it already exists
-            deleteInformationJobInIcs(jobId);
-        } catch (Exception e) {
-        }
+        createInformationJobInIcs(jobId, consumerJobInfo(typeId, filter));
+    }
+
+    private void createInformationJobInIcs(String jobId, ConsumerJobInfo jobInfo) {
+        String body = gson.toJson(jobInfo);
         restClient().putForEntity(jobUrl(jobId), body).block();
+        logger.info("Created job {}, {}", jobId, body);
     }
 
     private void deleteInformationJobInIcs(String jobId) {
-        restClient().delete(jobUrl(jobId)).block();
+        try {
+            restClient().delete(jobUrl(jobId)).block();
+        } catch (Exception e) {
+            logger.warn("Couldnot delete job: {}  reason: {}", jobId, e.getMessage());
+        }
     }
 
     private ConsumerJobInfo consumerJobInfo(String typeId, String filter) {
@@ -195,6 +206,10 @@ class IntegrationWithIcs {
         return "\"" + str + "\"";
     }
 
+    private String reQuote(String str) {
+        return str.replaceAll("'", "\\\"");
+    }
+
     private String consumerUri() {
         return selfBaseUrl() + ConsumerController.CONSUMER_TARGET_URL;
     }
@@ -205,6 +220,7 @@ class IntegrationWithIcs {
             String jsonStr = "{ \"filter\" :" + quote(filter) + "}";
             return new ConsumerJobInfo(typeId, jsonObject(jsonStr), "owner", consumerUri(), "");
         } catch (Exception e) {
+            logger.error("Error {}", e.getMessage());
             return null;
         }
     }
@@ -243,7 +259,6 @@ class IntegrationWithIcs {
 
         ApplicationTest.testErrorCode(restClient().put(jobUrl("KAFKA_JOB_ID"), body), HttpStatus.BAD_REQUEST,
                 "Json validation failure");
-
     }
 
     @Test
@@ -254,9 +269,9 @@ class IntegrationWithIcs {
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
-        DmaapSimulatorController.dmaapResponses.add("DmaapResponse1");
-        DmaapSimulatorController.dmaapResponses.add("DmaapResponse2");
-        DmaapSimulatorController.dmaapResponses.add("Junk");
+        DmaapSimulatorController.addResponse("DmaapResponse1");
+        DmaapSimulatorController.addResponse("DmaapResponse2");
+        DmaapSimulatorController.addResponse("Junk");
 
         ConsumerController.TestResults results = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(results.receivedBodies).hasSize(2));
@@ -267,4 +282,32 @@ class IntegrationWithIcs {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
     }
 
+    @Test
+    void testPmFilter() throws Exception {
+        await().untilAsserted(() -> assertThat(producerRegstrationTask.isRegisteredInIcs()).isTrue());
+        final String TYPE_ID = "PmInformationType";
+
+        String jsonStr =
+                reQuote("{ 'filterType' : 'pmdata', 'filter': { 'measTypes': [ 'succImmediateAssignProcs' ] } }");
+
+        ConsumerJobInfo jobInfo = new ConsumerJobInfo(TYPE_ID, jsonObject(jsonStr), "owner", consumerUri(), "");
+
+        createInformationJobInIcs(DMAAP_JOB_ID, jobInfo);
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+
+        String path = "./src/test/resources/pm_report.json";
+        String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
+        DmaapSimulatorController.addPmResponse(pmReportJson);
+
+        ConsumerController.TestResults results = this.consumerController.testResults;
+        await().untilAsserted(() -> assertThat(results.receivedBodies).hasSize(1));
+
+        String filtered = results.receivedBodies.get(0);
+        assertThat(filtered).contains("succImmediateAssignProcs").doesNotContain("attTCHSeizures");
+
+        logger.info(filtered);
+
+        deleteInformationJobInIcs(DMAAP_JOB_ID);
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
+    }
 }

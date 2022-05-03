@@ -182,6 +182,7 @@ public class Job {
 
     public String filter(String data) {
         if (filter == null) {
+            logger.debug("No filter used");
             return data;
         }
         return filter.filter(data);

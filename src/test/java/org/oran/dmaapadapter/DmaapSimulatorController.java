@@ -51,9 +51,18 @@ public class DmaapSimulatorController {
     public static final String DMAAP_TOPIC_URL = "/dmaap-topic-1";
     public static final String DMAAP_TOPIC_PM_URL = "/dmaap-topic-2";
 
-    public static List<String> dmaapResponses = Collections.synchronizedList(new LinkedList<String>());
+    private static List<String> dmaapResponses = Collections.synchronizedList(new LinkedList<String>());
 
-    public static List<String> dmaapPmResponses = Collections.synchronizedList(new LinkedList<String>());
+    private static List<String> dmaapPmResponses = Collections.synchronizedList(new LinkedList<String>());
+
+    public static void addPmResponse(String response) {
+        response = response.replace("\"", "\\\"");
+        dmaapPmResponses.add("[\"" + response + "\"]");
+    }
+
+    public static void addResponse(String response) {
+        dmaapResponses.add("[\"" + response + "\"]");
+    }
 
     @GetMapping(path = DMAAP_TOPIC_URL, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "GET from topic",
@@ -87,7 +96,6 @@ public class DmaapSimulatorController {
             String resp = dmaapPmResponses.remove(0);
             return new ResponseEntity<>(resp, HttpStatus.OK);
         }
-
     }
 
 }
