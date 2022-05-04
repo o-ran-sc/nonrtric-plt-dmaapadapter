@@ -21,6 +21,8 @@
 package org.oran.dmaapadapter.tasks;
 
 import java.time.Duration;
+import java.util.Collection;
+import java.util.LinkedList;
 
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
@@ -47,6 +49,7 @@ public class DmaapTopicConsumer {
     protected final ApplicationConfig applicationConfig;
     protected final InfoType type;
     protected final Jobs jobs;
+    private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
 
     public DmaapTopicConsumer(ApplicationConfig applicationConfig, InfoType type, Jobs jobs) {
         AsyncRestClientFactory restclientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig());
@@ -81,12 +84,18 @@ public class DmaapTopicConsumer {
                 .flatMap(notUsed -> Mono.empty());
     }
 
-    private Mono<String> getFromMessageRouter(String topicUrl) {
+    private Flux<String> getFromMessageRouter(String topicUrl) {
         logger.trace("getFromMessageRouter {}", topicUrl);
         return dmaapRestClient.get(topicUrl) //
                 .filter(body -> body.length() > 3) // DMAAP will return "[]" sometimes. That is thrown away.
+                .flatMapMany(body -> toMessages(body)) //
                 .doOnNext(message -> logger.debug("Message from DMAAP topic: {} : {}", topicUrl, message)) //
                 .onErrorResume(this::handleDmaapErrorResponse); //
+    }
+
+    private Flux<String> toMessages(String body) {
+        Collection<String> messages = gson.fromJson(body, LinkedList.class);
+        return Flux.fromIterable(messages);
     }
 
     private Mono<String> handleConsumerErrorResponse(Throwable t) {
@@ -94,17 +103,18 @@ public class DmaapTopicConsumer {
         return Mono.empty();
     }
 
-    protected Flux<String> pushDataToConsumers(String body) {
-        logger.debug("Received data {}", body);
+    protected Flux<String> pushDataToConsumers(String input) {
+        logger.debug("Received data {}", input);
         final int CONCURRENCY = 50;
 
         // Distibute the body to all jobs for this type
         return Flux.fromIterable(this.jobs.getJobsForType(this.type)) //
-                .map(job -> Tuples.of(job, job.filter(body))) //
+                .map(job -> Tuples.of(job, job.filter(input))) //
                 .filter(t -> !t.getT2().isEmpty()) //
                 .doOnNext(touple -> logger.debug("Sending to consumer {}", touple.getT1().getCallbackUrl())) //
                 .flatMap(touple -> touple.getT1().getConsumerRestClient().post("", touple.getT2(),
                         MediaType.APPLICATION_JSON), CONCURRENCY) //
                 .onErrorResume(this::handleConsumerErrorResponse);
     }
+
 }

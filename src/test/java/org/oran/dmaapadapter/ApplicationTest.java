@@ -317,8 +317,8 @@ class ApplicationTest {
 
         // Return two messages from DMAAP and verify that these are sent to the owner of
         // the job (consumer)
-        DmaapSimulatorController.dmaapResponses.add("DmaapResponse1");
-        DmaapSimulatorController.dmaapResponses.add("DmaapResponse2");
+        DmaapSimulatorController.addResponse("DmaapResponse1");
+        DmaapSimulatorController.addResponse("DmaapResponse2");
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(2));
         assertThat(consumer.receivedBodies.get(0)).isEqualTo("DmaapResponse1");
@@ -358,7 +358,7 @@ class ApplicationTest {
         // filtered PM message
         String path = "./src/test/resources/pm_report.json";
         String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
-        DmaapSimulatorController.dmaapPmResponses.add(pmReportJson);
+        DmaapSimulatorController.addPmResponse(pmReportJson);
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
@@ -388,7 +388,7 @@ class ApplicationTest {
         // filtered PM message
         String path = "./src/test/resources/pm_report.json";
         String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
-        DmaapSimulatorController.dmaapPmResponses.add(pmReportJson);
+        DmaapSimulatorController.addPmResponse(pmReportJson);
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
@@ -403,7 +403,7 @@ class ApplicationTest {
         // Register producer, Register types
         waitForRegistration();
 
-        // Create a job with a JsonPath
+        // Create a job with atestJsonPathFiltering JsonPath
         ConsumerJobInfo jobInfo = consumerJobInfo("PmInformationType", JOB_ID, this.jsonObjectJsonPath());
 
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
@@ -413,7 +413,7 @@ class ApplicationTest {
         // filtered PM message
         String path = "./src/test/resources/pm_report.json";
         String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
-        DmaapSimulatorController.dmaapPmResponses.add(pmReportJson);
+        DmaapSimulatorController.addPmResponse(pmReportJson);
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));

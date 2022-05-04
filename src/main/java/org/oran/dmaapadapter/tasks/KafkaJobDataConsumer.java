@@ -77,7 +77,7 @@ public class KafkaJobDataConsumer {
     public synchronized void start(Flux<String> input) {
         stop();
         this.errorStats.resetKafkaErrors();
-        this.subscription = getMessagesFromKafka(input, job) //
+        this.subscription = handleMessagesFromKafka(input, job) //
                 .flatMap(this::postToClient, job.getParameters().getMaxConcurrency()) //
                 .onErrorResume(this::handleError) //
                 .subscribe(this::handleConsumerSentOk, //
@@ -107,7 +107,7 @@ public class KafkaJobDataConsumer {
         return this.subscription != null;
     }
 
-    private Flux<String> getMessagesFromKafka(Flux<String> input, Job job) {
+    private Flux<String> handleMessagesFromKafka(Flux<String> input, Job job) {
         Flux<String> result = input.map(job::filter) //
                 .filter(t -> !t.isEmpty()); //
 
