@@ -32,7 +32,6 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.oran.dmaapadapter.controllers.ErrorResponse;
 import org.oran.dmaapadapter.controllers.VoidResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,12 +55,16 @@ public class DmaapSimulatorController {
     private static List<String> dmaapPmResponses = Collections.synchronizedList(new LinkedList<String>());
 
     public static void addPmResponse(String response) {
-        response = response.replace("\"", "\\\"");
-        dmaapPmResponses.add("[\"" + response + "\"]");
+        dmaapPmResponses.add("[" + quote(response) + "]");
     }
 
     public static void addResponse(String response) {
-        dmaapResponses.add("[\"" + response + "\"]");
+        dmaapResponses.add("[" + quote(response) + "]");
+    }
+
+    private static String quote(String str) {
+        final String q = "\"";
+        return q + str.replace(q, "\\\"") + q;
     }
 
     @GetMapping(path = DMAAP_TOPIC_URL, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -71,9 +74,9 @@ public class DmaapSimulatorController {
             @ApiResponse(responseCode = "200", description = "OK", //
                     content = @Content(schema = @Schema(implementation = VoidResponse.class))) //
     })
-    public ResponseEntity<Object> getFromTopic() {
+    public ResponseEntity<Object> getFromTopic() throws InterruptedException {
         if (dmaapResponses.isEmpty()) {
-            return ErrorResponse.create("", HttpStatus.NOT_FOUND);
+            return nothing();
         } else {
             String resp = dmaapResponses.remove(0);
             logger.info("DMAAP simulator returned: {}", resp);
@@ -89,13 +92,19 @@ public class DmaapSimulatorController {
             @ApiResponse(responseCode = "200", description = "OK", //
                     content = @Content(schema = @Schema(implementation = VoidResponse.class))) //
     })
-    public ResponseEntity<Object> getFromPmTopic() {
+    public ResponseEntity<Object> getFromPmTopic() throws InterruptedException {
         if (dmaapPmResponses.isEmpty()) {
-            return ErrorResponse.create("", HttpStatus.NOT_FOUND);
+            return nothing();
         } else {
             String resp = dmaapPmResponses.remove(0);
             return new ResponseEntity<>(resp, HttpStatus.OK);
         }
+    }
+
+    @SuppressWarnings("java:S2925") // sleep
+    private ResponseEntity<Object> nothing() throws InterruptedException {
+        Thread.sleep(1000); // caller will retry immediately, make it take a rest
+        return new ResponseEntity<>("[]", HttpStatus.OK);
     }
 
 }

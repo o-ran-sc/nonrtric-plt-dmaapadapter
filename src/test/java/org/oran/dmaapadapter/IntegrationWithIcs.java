@@ -203,7 +203,8 @@ class IntegrationWithIcs {
     }
 
     private String quote(String str) {
-        return "\"" + str + "\"";
+        final String q = "\"";
+        return q + str.replace(q, "\\\"") + q;
     }
 
     private String reQuote(String str) {

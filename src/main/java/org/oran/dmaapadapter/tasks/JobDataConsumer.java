@@ -37,8 +37,8 @@ import reactor.core.publisher.Mono;
  * owner via REST calls.
  */
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
-public class KafkaJobDataConsumer {
-    private static final Logger logger = LoggerFactory.getLogger(KafkaJobDataConsumer.class);
+public class JobDataConsumer {
+    private static final Logger logger = LoggerFactory.getLogger(JobDataConsumer.class);
     @Getter
     private final Job job;
     private Disposable subscription;
@@ -46,7 +46,7 @@ public class KafkaJobDataConsumer {
 
     private class ErrorStats {
         private int consumerFaultCounter = 0;
-        private boolean kafkaError = false; // eg. overflow
+        private boolean irrecoverableError = false; // eg. overflow
 
         public void handleOkFromConsumer() {
             this.consumerFaultCounter = 0;
@@ -56,37 +56,37 @@ public class KafkaJobDataConsumer {
             if (t instanceof WebClientResponseException) {
                 ++this.consumerFaultCounter;
             } else {
-                kafkaError = true;
+                irrecoverableError = true;
             }
         }
 
         public boolean isItHopeless() {
             final int STOP_AFTER_ERRORS = 5;
-            return kafkaError || consumerFaultCounter > STOP_AFTER_ERRORS;
+            return irrecoverableError || consumerFaultCounter > STOP_AFTER_ERRORS;
         }
 
-        public void resetKafkaErrors() {
-            kafkaError = false;
+        public void resetIrrecoverableErrors() {
+            irrecoverableError = false;
         }
     }
 
-    public KafkaJobDataConsumer(Job job) {
+    public JobDataConsumer(Job job) {
         this.job = job;
     }
 
     public synchronized void start(Flux<String> input) {
         stop();
-        this.errorStats.resetKafkaErrors();
-        this.subscription = handleMessagesFromKafka(input, job) //
+        this.errorStats.resetIrrecoverableErrors();
+        this.subscription = handleReceivedMessages(input, job) //
                 .flatMap(this::postToClient, job.getParameters().getMaxConcurrency()) //
                 .onErrorResume(this::handleError) //
                 .subscribe(this::handleConsumerSentOk, //
                         this::handleExceptionInStream, //
-                        () -> logger.warn("KafkaMessageConsumer stopped jobId: {}", job.getId()));
+                        () -> logger.warn("JobDataConsumer stopped jobId: {}", job.getId()));
     }
 
     private void handleExceptionInStream(Throwable t) {
-        logger.warn("KafkaMessageConsumer exception: {}, jobId: {}", t.getMessage(), job.getId());
+        logger.warn("JobDataConsumer exception: {}, jobId: {}", t.getMessage(), job.getId());
         stop();
     }
 
@@ -107,7 +107,7 @@ public class KafkaJobDataConsumer {
         return this.subscription != null;
     }
 
-    private Flux<String> handleMessagesFromKafka(Flux<String> input, Job job) {
+    private Flux<String> handleReceivedMessages(Flux<String> input, Job job) {
         Flux<String> result = input.map(job::filter) //
                 .filter(t -> !t.isEmpty()); //
 

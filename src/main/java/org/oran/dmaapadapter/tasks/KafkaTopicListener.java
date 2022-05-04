@@ -72,7 +72,7 @@ public class KafkaTopicListener {
                         () -> logger.warn("KafkaTopicReceiver stopped"));
     }
 
-    private void stop() {
+    public void stop() {
         if (topicReceiverTask != null) {
             topicReceiverTask.dispose();
             topicReceiverTask = null;

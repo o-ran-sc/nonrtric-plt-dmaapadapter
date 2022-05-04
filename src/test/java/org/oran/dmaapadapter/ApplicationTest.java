@@ -53,9 +53,9 @@ import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
 import org.oran.dmaapadapter.repository.filters.PmReportFilter;
-import org.oran.dmaapadapter.tasks.KafkaJobDataConsumer;
-import org.oran.dmaapadapter.tasks.KafkaTopicConsumers;
+import org.oran.dmaapadapter.tasks.JobDataConsumer;
 import org.oran.dmaapadapter.tasks.ProducerRegstrationTask;
+import org.oran.dmaapadapter.tasks.TopicListeners;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -101,7 +101,7 @@ class ApplicationTest {
     private IcsSimulatorController icsSimulatorController;
 
     @Autowired
-    KafkaTopicConsumers kafkaTopicConsumers;
+    TopicListeners topicListeners;
 
     @Autowired
     ProducerRegstrationTask producerRegistrationTask;
@@ -203,7 +203,8 @@ class ApplicationTest {
     }
 
     private String quote(String str) {
-        return "\"" + str + "\"";
+        final String q = "\"";
+        return q + str.replace(q, "\\\"") + q;
     }
 
     private Object jsonObjectFilter(String filter, String filterType) {
@@ -284,7 +285,7 @@ class ApplicationTest {
         this.icsSimulatorController.addJob(kafkaJobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
-        KafkaJobDataConsumer kafkaConsumer = this.kafkaTopicConsumers.getConsumers().get(TYPE_ID, JOB_ID);
+        JobDataConsumer kafkaConsumer = this.topicListeners.getKafkaConsumers().get(TYPE_ID, JOB_ID);
 
         // Handle received data from Kafka, check that it has been posted to the
         // consumer
@@ -299,20 +300,21 @@ class ApplicationTest {
 
         // Test regular restart of stopped
         kafkaConsumer.stop();
-        this.kafkaTopicConsumers.restartNonRunningTopics();
+        this.topicListeners.restartNonRunningKafkaTopics();
         await().untilAsserted(() -> assertThat(kafkaConsumer.isRunning()).isTrue());
     }
 
     @Test
     void testReceiveAndPostDataFromDmaap() throws Exception {
-        final String JOB_ID = "ID";
+        final String JOB_ID = "testReceiveAndPostDataFromDmaap";
 
         // Register producer, Register types
         waitForRegistration();
 
         // Create a job
-        this.icsSimulatorController.addJob(consumerJobInfo("DmaapInformationType", JOB_ID, jsonObjectRegexp()), JOB_ID,
-                restClient());
+        Job.Parameters param = new Job.Parameters(null, null, new Job.BufferTimeout(123, 456), 1);
+        ConsumerJobInfo jobInfo = consumerJobInfo("DmaapInformationType", JOB_ID, toJson(gson.toJson(param)));
+        this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
         // Return two messages from DMAAP and verify that these are sent to the owner of
@@ -320,8 +322,9 @@ class ApplicationTest {
         DmaapSimulatorController.addResponse("DmaapResponse1");
         DmaapSimulatorController.addResponse("DmaapResponse2");
         ConsumerController.TestResults consumer = this.consumerController.testResults;
-        await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(2));
-        assertThat(consumer.receivedBodies.get(0)).isEqualTo("DmaapResponse1");
+        await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
+        assertThat(consumer.receivedBodies.get(0)).contains("[\"DmaapResponse1");
+        assertThat(consumer.receivedBodies.get(0)).contains("DmaapResponse2\"]");
 
         String jobUrl = baseUrl() + ProducerCallbacksController.JOB_URL;
         String jobs = restClient().get(jobUrl).block();
@@ -403,7 +406,7 @@ class ApplicationTest {
         // Register producer, Register types
         waitForRegistration();
 
-        // Create a job with atestJsonPathFiltering JsonPath
+        // Create a job with JsonPath Filtering
         ConsumerJobInfo jobInfo = consumerJobInfo("PmInformationType", JOB_ID, this.jsonObjectJsonPath());
 
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());

@@ -42,7 +42,7 @@ Each entry will be registered as a subscribe information type in ICS. The follow
 * kafkaInputTopic, a Kafka topic to listen to. Defaults to not listen to any topic.
 
 * useHttpProxy, indicates if a HTTP proxy shall be used for data delivery (if configured). Defaults to false.
-  This parameter is only relevant if a HTTPproxy is configured in the application.yaml file. 
+  This parameter is only relevant if a HTTPproxy is configured in the application.yaml file.
 
 * dataType, this can be set to "pmData" which gives a possibility to perform a special filtering of PM data.
 
@@ -78,11 +78,10 @@ Information Job Parameters
 When an information consumer creates an information job,it can provide type specific parameters. The allowed parameters are defined by a Json Schema.
 The following schemas can be used by the component (are located in dmaapadapter/src/main/resources):
 
-====================
-typeSchemaDmaap.json
-====================
-This schema will be registered when dmaapTopicUrl is defined for the type. You can provide two parameters when creating the job which are
-used for filtering of the data.
+===============
+typeSchema.json
+===============
+This schema will by default be registerred for the type. The following properties are defined:
 
 * filterType, selects the type of filtering that will be done. This can be one of: "regexp", "json-path", "jslt".
 
@@ -91,6 +90,13 @@ used for filtering of the data.
   * jslt, which is an open source language for JSON processing. It can be used both for selecting matching json objects and for extracting or even transforming of json data. This is very powerful.
 
 * filter, the value of the filter expression.
+* bufferTimeout can be used to buffer several json objects received from Kafka when kafkaInputTopic is defined into one json array. If bufferTimeout is used, the delivered data will be a Json array of the objects received. If not, each received object will be delivered in a separate call. This contains:
+
+  * maxSize, the maximum number of objects to collect before delivery to the consumer
+  * maxTimeMiliseconds, the maximum time to delay delivery (to buffer).
+
+* maxConcurrency, defines max how many paralell REST calls the consumer wishes to receive. 1, which is default, means sequential. A higher values may increase throughput.
+
 
 Below follows examples of a filters.
 
@@ -117,16 +123,28 @@ Below follows examples of a filters.
       "filter": "$.event.perf3gppFields.measDataCollection.measInfoList[0].measTypes.sMeasTypesList[0]"
     }
 
+Below follows an example of using bufferTimeout and maxConcurrency.
+
+.. code-block:: javascript
+
+    {
+       "bufferTimeout":{
+          "maxSize":123,
+          "maxTimeMiliseconds":456
+       },
+       "maxConcurrency":1
+    }
 
 
-==========================
-typeSchemaPmDataDmaap.json
-==========================
-This schema will be registered when dmaapTopicUrl is defined and the dataType is "pmData" for the type.
+
+=====================
+typeSchemaPmData.json
+=====================
+This schema will be registered when the configured dataType is "pmData".
 This will extend the filtering capabilities so that a special filter for PM data can be used. Here it is possible to
-define which meas types to get from which resources.
+define which meas-types (counters) to get from which resources.
 
-The filterType parameter is extended to have value "pmdata" that can be used for PM data filtering. 
+The filterType parameter is extended to allow value "pmdata" which can be used for PM data filtering.
 
 * sourceNames an array of source names for wanted PM reports.
 * measObjInstIds an array of meas object instances for wanted PM reports. If a the given filter value is contained in the filter definition, it will match (partial matching).
@@ -158,46 +176,3 @@ Below follows an example on a PM filter.
         ]
       }
     }
-
-
-====================
-typeSchemaKafka.json
-====================
-This schema will be registered when kafkaInputTopic is defined for the type.
-
-* filterType, see above.
-* filter, see above.
-* bufferTimeout can be used to buffer several json objects received from Kafka when kafkaInputTopic is defined into one json array. This contains:
-
-  * maxSize, the maximum number of objects to collect before delivery to the consumer
-  * maxTimeMiliseconds, the maximum time to delay delivery (to buffer).
-
-* maxConcurrency, defines max how many paralell REST calls the consumer wishes to receive. 1, which is default, means sequential. A higher values may increase throughput. 
-
-If bufferTimeout is used, the delivered data will be a Json array of the objects received. If not, each received object will be delivered in a separate call.
-
-Below follows an example.
-
-.. code-block:: javascript
-
-    {
-       "bufferTimeout":{
-          "maxSize":123,
-          "maxTimeMiliseconds":456
-       },
-       "maxConcurrency":1
-    }
-
-
-==========================
-typeSchemaPmDataKafka.json
-==========================
-This schema will be registered when kafkaInputTopic is defined and the dataType is "pmData" for the type.
-
-This schema will allow all parameters above.
-
-* filterType (one of: "regexp", "json-path", "jslt" or "pmdata")
-* filter, see above.
-* bufferTimeout, see above.
-
-
