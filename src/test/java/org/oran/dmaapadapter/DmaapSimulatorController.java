@@ -32,7 +32,6 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.oran.dmaapadapter.controllers.ErrorResponse;
 import org.oran.dmaapadapter.controllers.VoidResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,9 +70,9 @@ public class DmaapSimulatorController {
             @ApiResponse(responseCode = "200", description = "OK", //
                     content = @Content(schema = @Schema(implementation = VoidResponse.class))) //
     })
-    public ResponseEntity<Object> getFromTopic() {
+    public ResponseEntity<Object> getFromTopic() throws InterruptedException {
         if (dmaapResponses.isEmpty()) {
-            return ErrorResponse.create("", HttpStatus.NOT_FOUND);
+            return nothing();
         } else {
             String resp = dmaapResponses.remove(0);
             logger.info("DMAAP simulator returned: {}", resp);
@@ -89,13 +88,18 @@ public class DmaapSimulatorController {
             @ApiResponse(responseCode = "200", description = "OK", //
                     content = @Content(schema = @Schema(implementation = VoidResponse.class))) //
     })
-    public ResponseEntity<Object> getFromPmTopic() {
+    public ResponseEntity<Object> getFromPmTopic() throws InterruptedException {
         if (dmaapPmResponses.isEmpty()) {
-            return ErrorResponse.create("", HttpStatus.NOT_FOUND);
+            return nothing();
         } else {
             String resp = dmaapPmResponses.remove(0);
             return new ResponseEntity<>(resp, HttpStatus.OK);
         }
+    }
+
+    private ResponseEntity<Object> nothing() throws InterruptedException {
+        Thread.sleep(1000); // caller will retry immediately, make it take a rest
+        return new ResponseEntity<>("[]", HttpStatus.OK);
     }
 
 }

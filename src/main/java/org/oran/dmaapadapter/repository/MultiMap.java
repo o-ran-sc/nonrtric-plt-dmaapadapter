@@ -20,6 +20,7 @@
 
 package org.oran.dmaapadapter.repository;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -69,6 +70,14 @@ public class MultiMap<T> {
 
     public Set<String> keySet() {
         return this.map.keySet();
+    }
+
+    public Collection<T> values() {
+        ArrayList<T> result = new ArrayList<>();
+        for (String key : keySet()) {
+            result.addAll(get(key));
+        }
+        return result;
     }
 
     public void clear() {

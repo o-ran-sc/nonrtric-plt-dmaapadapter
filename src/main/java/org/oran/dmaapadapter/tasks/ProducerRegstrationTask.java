@@ -123,8 +123,8 @@ public class ProducerRegstrationTask {
 
     private Mono<String> registerTypesAndProducer() {
         final int CONCURRENCY = 20;
-        final String producerUrl =
-                applicationConfig.getIcsBaseUrl() + "/data-producer/v1/info-producers/" + PRODUCER_ID;
+        final String producerUrl = applicationConfig.getIcsBaseUrl() + "/data-producer/v1/info-producers/"
+                + PRODUCER_ID;
 
         return Flux.fromIterable(this.types.getAll()) //
                 .doOnNext(type -> logger.info("Registering type {}", type.getId())) //
@@ -151,9 +151,9 @@ public class ProducerRegstrationTask {
     private Object jsonSchemaObject(InfoType type) throws IOException, ServiceException {
         String schemaFile;
         if (type.getDataType() == InfoType.DataType.PM_DATA) {
-            schemaFile = type.isKafkaTopicDefined() ? "/typeSchemaPmDataKafka.json" : "/typeSchemaPmDataDmaap.json";
+            schemaFile = "/typeSchemaPmData.json";
         } else {
-            schemaFile = type.isKafkaTopicDefined() ? "/typeSchemaKafka.json" : "/typeSchemaDmaap.json";
+            schemaFile = "/typeSchema.json";
         }
         return jsonObject(readSchemaFile(schemaFile));
     }

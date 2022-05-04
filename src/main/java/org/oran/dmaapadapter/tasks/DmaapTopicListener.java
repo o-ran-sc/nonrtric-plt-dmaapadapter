@@ -31,47 +31,72 @@ import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.Jobs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.MediaType;
 
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuples;
+import reactor.core.publisher.Sinks;
+import reactor.core.publisher.Sinks.Many;
 
 /**
  * The class fetches incoming requests from DMAAP and sends them further to the
  * consumers that has a job for this InformationType.
  */
-public class DmaapTopicConsumer {
-    private static final Duration TIME_BETWEEN_DMAAP_RETRIES = Duration.ofSeconds(10);
-    private static final Logger logger = LoggerFactory.getLogger(DmaapTopicConsumer.class);
+public class DmaapTopicListener {
+    private static final Duration TIME_BETWEEN_DMAAP_RETRIES = Duration.ofSeconds(3);
+    private static final Logger logger = LoggerFactory.getLogger(DmaapTopicListener.class);
 
     private final AsyncRestClient dmaapRestClient;
     protected final ApplicationConfig applicationConfig;
     protected final InfoType type;
     protected final Jobs jobs;
     private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+    private Many<String> output;
+    private Disposable topicReceiverTask;
 
-    public DmaapTopicConsumer(ApplicationConfig applicationConfig, InfoType type, Jobs jobs) {
+    public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type, Jobs jobs) {
         AsyncRestClientFactory restclientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig());
         this.dmaapRestClient = restclientFactory.createRestClientNoHttpProxy("");
         this.applicationConfig = applicationConfig;
         this.type = type;
         this.jobs = jobs;
+
+    }
+
+    public Many<String> getOutput() {
+        return this.output;
     }
 
     public void start() {
-        Flux.range(0, Integer.MAX_VALUE) //
+        stop();
+
+        final int CONSUMER_BACKPRESSURE_BUFFER_SIZE = 1024 * 10;
+        this.output = Sinks.many().multicast().onBackpressureBuffer(CONSUMER_BACKPRESSURE_BUFFER_SIZE);
+
+        topicReceiverTask = Flux.range(0, Integer.MAX_VALUE) //
                 .flatMap(notUsed -> getFromMessageRouter(getDmaapUrl()), 1) //
-                .flatMap(this::pushDataToConsumers) //
+                .doOnNext(this::onReceivedData) //
                 .subscribe(//
                         null, //
                         throwable -> logger.error("DmaapMessageConsumer error: {}", throwable.getMessage()), //
                         this::onComplete); //
     }
 
+    public void stop() {
+        if (topicReceiverTask != null) {
+            topicReceiverTask.dispose();
+            topicReceiverTask = null;
+        }
+    }
+
     private void onComplete() {
         logger.warn("DmaapMessageConsumer completed {}", type.getId());
         start();
+    }
+
+    private void onReceivedData(String input) {
+        logger.debug("Received from DMAAP topic: {} :{}", this.type.getDmaapTopicUrl(), input);
+        output.emitNext(input, Sinks.EmitFailureHandler.FAIL_FAST);
     }
 
     private String getDmaapUrl() {
@@ -88,33 +113,14 @@ public class DmaapTopicConsumer {
         logger.trace("getFromMessageRouter {}", topicUrl);
         return dmaapRestClient.get(topicUrl) //
                 .filter(body -> body.length() > 3) // DMAAP will return "[]" sometimes. That is thrown away.
-                .flatMapMany(body -> toMessages(body)) //
+                .flatMapMany(this::splitArray) //
                 .doOnNext(message -> logger.debug("Message from DMAAP topic: {} : {}", topicUrl, message)) //
                 .onErrorResume(this::handleDmaapErrorResponse); //
     }
 
-    private Flux<String> toMessages(String body) {
+    private Flux<String> splitArray(String body) {
         Collection<String> messages = gson.fromJson(body, LinkedList.class);
         return Flux.fromIterable(messages);
-    }
-
-    private Mono<String> handleConsumerErrorResponse(Throwable t) {
-        logger.warn("error from CONSUMER {}", t.getMessage());
-        return Mono.empty();
-    }
-
-    protected Flux<String> pushDataToConsumers(String input) {
-        logger.debug("Received data {}", input);
-        final int CONCURRENCY = 50;
-
-        // Distibute the body to all jobs for this type
-        return Flux.fromIterable(this.jobs.getJobsForType(this.type)) //
-                .map(job -> Tuples.of(job, job.filter(input))) //
-                .filter(t -> !t.getT2().isEmpty()) //
-                .doOnNext(touple -> logger.debug("Sending to consumer {}", touple.getT1().getCallbackUrl())) //
-                .flatMap(touple -> touple.getT1().getConsumerRestClient().post("", touple.getT2(),
-                        MediaType.APPLICATION_JSON), CONCURRENCY) //
-                .onErrorResume(this::handleConsumerErrorResponse);
     }
 
 }

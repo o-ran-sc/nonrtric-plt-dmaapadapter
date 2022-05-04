@@ -53,9 +53,9 @@ import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
 import org.oran.dmaapadapter.repository.filters.PmReportFilter;
-import org.oran.dmaapadapter.tasks.KafkaJobDataConsumer;
-import org.oran.dmaapadapter.tasks.KafkaTopicConsumers;
+import org.oran.dmaapadapter.tasks.JobDataConsumer;
 import org.oran.dmaapadapter.tasks.ProducerRegstrationTask;
+import org.oran.dmaapadapter.tasks.TopicListeners;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -101,7 +101,7 @@ class ApplicationTest {
     private IcsSimulatorController icsSimulatorController;
 
     @Autowired
-    KafkaTopicConsumers kafkaTopicConsumers;
+    TopicListeners topicListeners;
 
     @Autowired
     ProducerRegstrationTask producerRegistrationTask;
@@ -284,7 +284,7 @@ class ApplicationTest {
         this.icsSimulatorController.addJob(kafkaJobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
-        KafkaJobDataConsumer kafkaConsumer = this.kafkaTopicConsumers.getConsumers().get(TYPE_ID, JOB_ID);
+        JobDataConsumer kafkaConsumer = this.topicListeners.getKafkaConsumers().get(TYPE_ID, JOB_ID);
 
         // Handle received data from Kafka, check that it has been posted to the
         // consumer
@@ -299,13 +299,13 @@ class ApplicationTest {
 
         // Test regular restart of stopped
         kafkaConsumer.stop();
-        this.kafkaTopicConsumers.restartNonRunningTopics();
+        this.topicListeners.restartNonRunningKafkaTopics();
         await().untilAsserted(() -> assertThat(kafkaConsumer.isRunning()).isTrue());
     }
 
     @Test
     void testReceiveAndPostDataFromDmaap() throws Exception {
-        final String JOB_ID = "ID";
+        final String JOB_ID = "testReceiveAndPostDataFromDmaap";
 
         // Register producer, Register types
         waitForRegistration();
@@ -403,7 +403,7 @@ class ApplicationTest {
         // Register producer, Register types
         waitForRegistration();
 
-        // Create a job with atestJsonPathFiltering JsonPath
+        // Create a job with JsonPath Filtering
         ConsumerJobInfo jobInfo = consumerJobInfo("PmInformationType", JOB_ID, this.jsonObjectJsonPath());
 
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());

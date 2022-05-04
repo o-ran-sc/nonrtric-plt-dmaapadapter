@@ -110,9 +110,11 @@ public class Jobs {
             this.allJobs.remove(job.getId());
             jobsByType.remove(job.getType().getId(), job.getId());
         }
-        synchronized (observers) {
-            this.observers.forEach(obs -> obs.onJobRemoved(job));
-        }
+        notifyJobRemoved(job);
+    }
+
+    private synchronized void notifyJobRemoved(Job job) {
+        this.observers.forEach(obs -> obs.onJobRemoved(job));
     }
 
     public synchronized int size() {
@@ -123,8 +125,13 @@ public class Jobs {
         return jobsByType.get(type.getId());
     }
 
-    public synchronized void clear() {
-        allJobs.clear();
-        jobsByType.clear();
+    public void clear() {
+
+        this.allJobs.forEach((id, job) -> notifyJobRemoved(job));
+
+        synchronized (this) {
+            allJobs.clear();
+            jobsByType.clear();
+        }
     }
 }
