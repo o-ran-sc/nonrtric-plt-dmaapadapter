@@ -43,7 +43,7 @@ import reactor.kafka.receiver.ReceiverOptions;
  * to a multi cast sink, which several other streams can connect to.
  */
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
-public class KafkaTopicListener {
+public class KafkaTopicListener implements TopicListener {
     private static final Logger logger = LoggerFactory.getLogger(KafkaTopicListener.class);
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
@@ -55,10 +55,12 @@ public class KafkaTopicListener {
         this.type = type;
     }
 
+    @Override
     public Many<String> getOutput() {
         return this.output;
     }
 
+    @Override
     public void start() {
         stop();
         final int CONSUMER_BACKPRESSURE_BUFFER_SIZE = 1024 * 10;
@@ -72,6 +74,7 @@ public class KafkaTopicListener {
                         () -> logger.warn("KafkaTopicReceiver stopped"));
     }
 
+    @Override
     public void stop() {
         if (topicReceiverTask != null) {
             topicReceiverTask.dispose();

@@ -44,8 +44,8 @@ import org.springframework.stereotype.Component;
 public class TopicListeners {
     private static final Logger logger = LoggerFactory.getLogger(TopicListeners.class);
 
-    private final Map<String, KafkaTopicListener> kafkaTopicListeners = new HashMap<>(); // Key is typeId
-    private final Map<String, DmaapTopicListener> dmaapTopicListeners = new HashMap<>(); // Key is typeId
+    private final Map<String, TopicListener> kafkaTopicListeners = new HashMap<>(); // Key is typeId
+    private final Map<String, TopicListener> dmaapTopicListeners = new HashMap<>(); // Key is typeId
 
     @Getter
     private final MultiMap<JobDataConsumer> kafkaConsumers = new MultiMap<>(); // Key is typeId, jobId
@@ -61,7 +61,7 @@ public class TopicListeners {
                 kafkaTopicListeners.put(type.getId(), topicConsumer);
             }
             if (type.isDmaapTopicDefined()) {
-                DmaapTopicListener topicListener = new DmaapTopicListener(appConfig, type, jobs);
+                DmaapTopicListener topicListener = new DmaapTopicListener(appConfig, type);
                 dmaapTopicListeners.put(type.getId(), topicListener);
             }
         }
@@ -83,35 +83,34 @@ public class TopicListeners {
         removeJob(job);
         logger.debug("Job added {}", job.getId());
         if (job.getType().isKafkaTopicDefined()) {
-            KafkaTopicListener topicListener = kafkaTopicListeners.get(job.getType().getId());
-            if (kafkaConsumers.get(job.getType().getId()).isEmpty()) {
-                topicListener.start();
-            }
-            JobDataConsumer subscription = new JobDataConsumer(job);
-            subscription.start(topicListener.getOutput().asFlux());
-            kafkaConsumers.put(job.getType().getId(), job.getId(), subscription);
+            addJob(job, kafkaConsumers, kafkaTopicListeners);
         }
 
         if (job.getType().isDmaapTopicDefined()) {
-            DmaapTopicListener topicListener = dmaapTopicListeners.get(job.getType().getId());
-            if (dmaapConsumers.get(job.getType().getId()).isEmpty()) {
-                topicListener.start();
-            }
-            JobDataConsumer subscription = new JobDataConsumer(job);
-            subscription.start(topicListener.getOutput().asFlux());
-            dmaapConsumers.put(job.getType().getId(), job.getId(), subscription);
+            addJob(job, dmaapConsumers, dmaapTopicListeners);
         }
     }
 
-    public synchronized void removeJob(Job job) {
-        JobDataConsumer consumer = kafkaConsumers.remove(job.getType().getId(), job.getId());
-        if (consumer != null) {
-            logger.debug("Kafka job removed {}", job.getId());
-            consumer.stop();
+    private static void addJob(Job job, MultiMap<JobDataConsumer> consumers,
+            Map<String, TopicListener> topicListeners) {
+        TopicListener topicListener = topicListeners.get(job.getType().getId());
+        if (consumers.get(job.getType().getId()).isEmpty()) {
+            topicListener.start();
         }
-        consumer = this.dmaapConsumers.remove(job.getType().getId(), job.getId());
+        JobDataConsumer subscription = new JobDataConsumer(job);
+        subscription.start(topicListener.getOutput().asFlux());
+        consumers.put(job.getType().getId(), job.getId(), subscription);
+    }
+
+    public synchronized void removeJob(Job job) {
+        removeJob(job, kafkaConsumers);
+        removeJob(job, dmaapConsumers);
+    }
+
+    private static void removeJob(Job job, MultiMap<JobDataConsumer> consumers) {
+        JobDataConsumer consumer = consumers.remove(job.getType().getId(), job.getId());
         if (consumer != null) {
-            logger.debug("DMAAP job removed {}", job.getId());
+            logger.debug("Job removed {}", job.getId());
             consumer.stop();
         }
     }
@@ -121,20 +120,22 @@ public class TopicListeners {
         for (String typeId : this.kafkaConsumers.keySet()) {
             for (JobDataConsumer consumer : this.kafkaConsumers.get(typeId)) {
                 if (!consumer.isRunning()) {
-                    restartKafkaTopic(consumer);
+                    restartTopicAndConsumers(this.kafkaTopicListeners, this.kafkaConsumers, consumer);
                 }
             }
         }
     }
 
-    private void restartKafkaTopic(JobDataConsumer consumer) {
+    private static void restartTopicAndConsumers(Map<String, TopicListener> topicListeners,
+            MultiMap<JobDataConsumer> consumers, JobDataConsumer consumer) {
         InfoType type = consumer.getJob().getType();
-        KafkaTopicListener topic = this.kafkaTopicListeners.get(type.getId());
+        TopicListener topic = topicListeners.get(type.getId());
         topic.start();
-        restartConsumersOfType(topic, type);
+        restartConsumersOfType(consumers, topic, type);
     }
 
-    private void restartConsumersOfType(KafkaTopicListener topic, InfoType type) {
-        this.kafkaConsumers.get(type.getId()).forEach(consumer -> consumer.start(topic.getOutput().asFlux()));
+    private static void restartConsumersOfType(MultiMap<JobDataConsumer> consumers, TopicListener topic,
+            InfoType type) {
+        consumers.get(type.getId()).forEach(consumer -> consumer.start(topic.getOutput().asFlux()));
     }
 }
