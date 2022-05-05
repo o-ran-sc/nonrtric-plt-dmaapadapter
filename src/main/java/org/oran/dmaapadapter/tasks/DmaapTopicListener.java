@@ -28,7 +28,6 @@ import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.repository.InfoType;
-import org.oran.dmaapadapter.repository.Jobs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,31 +41,30 @@ import reactor.core.publisher.Sinks.Many;
  * The class fetches incoming requests from DMAAP and sends them further to the
  * consumers that has a job for this InformationType.
  */
-public class DmaapTopicListener {
+public class DmaapTopicListener implements TopicListener {
     private static final Duration TIME_BETWEEN_DMAAP_RETRIES = Duration.ofSeconds(3);
     private static final Logger logger = LoggerFactory.getLogger(DmaapTopicListener.class);
 
     private final AsyncRestClient dmaapRestClient;
-    protected final ApplicationConfig applicationConfig;
-    protected final InfoType type;
-    protected final Jobs jobs;
+    private final ApplicationConfig applicationConfig;
+    private final InfoType type;
     private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
     private Many<String> output;
     private Disposable topicReceiverTask;
 
-    public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type, Jobs jobs) {
+    public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type) {
         AsyncRestClientFactory restclientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig());
         this.dmaapRestClient = restclientFactory.createRestClientNoHttpProxy("");
         this.applicationConfig = applicationConfig;
         this.type = type;
-        this.jobs = jobs;
-
     }
 
+    @Override
     public Many<String> getOutput() {
         return this.output;
     }
 
+    @Override
     public void start() {
         stop();
 
@@ -82,6 +80,7 @@ public class DmaapTopicListener {
                         this::onComplete); //
     }
 
+    @Override
     public void stop() {
         if (topicReceiverTask != null) {
             topicReceiverTask.dispose();

@@ -68,7 +68,7 @@ public class ProducerRegstrationTask {
     private static final String PRODUCER_ID = "DmaapGenericInfoProducer";
     @Getter
     private boolean isRegisteredInIcs = false;
-    private static final int REGISTRATION_SUPERVISION_INTERVAL_MS = 1000 * 5;
+    private static final int REGISTRATION_SUPERVISION_INTERVAL_MS = 1000 * 10;
 
     public ProducerRegstrationTask(@Autowired ApplicationConfig applicationConfig, @Autowired InfoTypes types) {
         AsyncRestClientFactory restClientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig());
