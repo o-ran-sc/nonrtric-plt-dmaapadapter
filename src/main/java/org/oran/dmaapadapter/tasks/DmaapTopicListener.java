@@ -42,7 +42,7 @@ import reactor.core.publisher.Sinks.Many;
  * The class fetches incoming requests from DMAAP and sends them further to the
  * consumers that has a job for this InformationType.
  */
-public class DmaapTopicListener {
+public class DmaapTopicListener implements TopicListener {
     private static final Duration TIME_BETWEEN_DMAAP_RETRIES = Duration.ofSeconds(3);
     private static final Logger logger = LoggerFactory.getLogger(DmaapTopicListener.class);
 
@@ -63,10 +63,12 @@ public class DmaapTopicListener {
 
     }
 
+    @Override
     public Many<String> getOutput() {
         return this.output;
     }
 
+    @Override
     public void start() {
         stop();
 
@@ -82,6 +84,7 @@ public class DmaapTopicListener {
                         this::onComplete); //
     }
 
+    @Override
     public void stop() {
         if (topicReceiverTask != null) {
             topicReceiverTask.dispose();
