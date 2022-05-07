@@ -57,4 +57,5 @@ app:
   # several redundant boostrap servers can be specified, separated by a comma ','.
   kafka:
     bootstrap-servers: localhost:9092
-
+  # If the file name is empty, no authorization token is used
+  auth-token-file:

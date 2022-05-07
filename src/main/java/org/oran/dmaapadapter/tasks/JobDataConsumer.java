@@ -77,7 +77,7 @@ public class JobDataConsumer {
     public synchronized void start(Flux<String> input) {
         stop();
         this.errorStats.resetIrrecoverableErrors();
-        this.subscription = handleReceivedMessages(input, job) //
+        this.subscription = handleReceivedMessage(input, job) //
                 .flatMap(this::postToClient, job.getParameters().getMaxConcurrency()) //
                 .onErrorResume(this::handleError) //
                 .subscribe(this::handleConsumerSentOk, //
@@ -107,7 +107,7 @@ public class JobDataConsumer {
         return this.subscription != null;
     }
 
-    private Flux<String> handleReceivedMessages(Flux<String> input, Job job) {
+    private Flux<String> handleReceivedMessage(Flux<String> input, Job job) {
         Flux<String> result = input.map(job::filter) //
                 .filter(t -> !t.isEmpty()); //
 

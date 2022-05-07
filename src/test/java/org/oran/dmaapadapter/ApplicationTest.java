@@ -33,6 +33,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 
 import org.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
+import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.ImmutableHttpProxyConfig;
 import org.oran.dmaapadapter.configuration.ImmutableWebClientConfig;
@@ -105,6 +107,9 @@ class ApplicationTest {
 
     @Autowired
     ProducerRegstrationTask producerRegistrationTask;
+
+    @Autowired
+    private SecurityContext securityContext;
 
     private com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
 
@@ -181,7 +186,7 @@ class ApplicationTest {
                 .trustStorePassword(config.trustStorePassword()) //
                 .httpProxyConfig(httpProxyConfig).build();
 
-        AsyncRestClientFactory restClientFactory = new AsyncRestClientFactory(config);
+        AsyncRestClientFactory restClientFactory = new AsyncRestClientFactory(config, securityContext);
         return restClientFactory.createRestClientNoHttpProxy(baseUrl());
     }
 
@@ -371,7 +376,6 @@ class ApplicationTest {
 
     @Test
     void testJsltFiltering() throws Exception {
-
         final String JOB_ID = "ID";
 
         // Register producer, Register types
@@ -397,6 +401,41 @@ class ApplicationTest {
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
         String receivedFiltered = consumer.receivedBodies.get(0);
         assertThat(receivedFiltered).contains("event");
+    }
+
+    @Test
+    void testAuthToken() throws Exception {
+
+        // Create an auth token
+        final String AUTH_TOKEN = "testToken";
+        Path authFile = Files.createTempFile("icsTestAuthToken", ".txt");
+        Files.write(authFile, AUTH_TOKEN.getBytes());
+        this.securityContext.setAuthTokenFilePath(authFile);
+
+        final String JOB_ID = "ID";
+
+        // Register producer, Register types
+        waitForRegistration();
+
+        // Create a job with a PM filter
+
+        ConsumerJobInfo jobInfo = consumerJobInfo("DmaapInformationType", JOB_ID, jsonObjectRegexp());
+
+        this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+
+        DmaapSimulatorController.addResponse("Hello");
+
+        ConsumerController.TestResults consumer = this.consumerController.testResults;
+        await().untilAsserted(() -> assertThat(consumer.receivedHeaders).hasSize(1));
+        String received = consumer.receivedBodies.get(0);
+        assertThat(received).isEqualTo("Hello");
+
+        // Check that the auth token was received by the consumer
+        assertThat(consumer.receivedHeaders).hasSize(1);
+        Map<String, String> headers = consumer.receivedHeaders.get(0);
+        assertThat(headers).containsEntry("authorization", "Bearer " + AUTH_TOKEN);
+        Files.delete(authFile);
     }
 
     @Test

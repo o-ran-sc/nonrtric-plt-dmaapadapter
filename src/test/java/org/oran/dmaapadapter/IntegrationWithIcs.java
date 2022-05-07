@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
+import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.ImmutableHttpProxyConfig;
 import org.oran.dmaapadapter.configuration.ImmutableWebClientConfig;
@@ -84,6 +85,9 @@ class IntegrationWithIcs {
 
     @Autowired
     private ConsumerController consumerController;
+
+    @Autowired
+    private SecurityContext securityContext;
 
     private static Gson gson = new GsonBuilder().create();
 
@@ -152,7 +156,7 @@ class IntegrationWithIcs {
                 .trustStorePassword(config.trustStorePassword()) //
                 .httpProxyConfig(httpProxyConfig).build();
 
-        AsyncRestClientFactory restClientFactory = new AsyncRestClientFactory(config);
+        AsyncRestClientFactory restClientFactory = new AsyncRestClientFactory(config, securityContext);
         return restClientFactory.createRestClientNoHttpProxy(selfBaseUrl());
     }
 

@@ -25,6 +25,7 @@ import java.util.Map;
 
 import lombok.Getter;
 
+import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.InfoTypes;
@@ -53,7 +54,8 @@ public class TopicListeners {
 
     private static final int CONSUMER_SUPERVISION_INTERVAL_MS = 1000 * 60 * 3;
 
-    public TopicListeners(@Autowired ApplicationConfig appConfig, @Autowired InfoTypes types, @Autowired Jobs jobs) {
+    public TopicListeners(@Autowired ApplicationConfig appConfig, @Autowired InfoTypes types, @Autowired Jobs jobs,
+            @Autowired SecurityContext securityContext) {
 
         for (InfoType type : types.getAll()) {
             if (type.isKafkaTopicDefined()) {
@@ -61,7 +63,7 @@ public class TopicListeners {
                 kafkaTopicListeners.put(type.getId(), topicConsumer);
             }
             if (type.isDmaapTopicDefined()) {
-                DmaapTopicListener topicListener = new DmaapTopicListener(appConfig, type);
+                DmaapTopicListener topicListener = new DmaapTopicListener(appConfig, type, securityContext);
                 dmaapTopicListeners.put(type.getId(), topicListener);
             }
         }

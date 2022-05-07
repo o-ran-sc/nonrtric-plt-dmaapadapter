@@ -21,11 +21,10 @@
 package org.oran.dmaapadapter.tasks;
 
 import java.time.Duration;
-import java.util.Collection;
-import java.util.LinkedList;
 
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
+import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.slf4j.Logger;
@@ -52,8 +51,9 @@ public class DmaapTopicListener implements TopicListener {
     private Many<String> output;
     private Disposable topicReceiverTask;
 
-    public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type) {
-        AsyncRestClientFactory restclientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig());
+    public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type, SecurityContext securityContext) {
+        AsyncRestClientFactory restclientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig(),
+                securityContext);
         this.dmaapRestClient = restclientFactory.createRestClientNoHttpProxy("");
         this.applicationConfig = applicationConfig;
         this.type = type;
@@ -112,14 +112,14 @@ public class DmaapTopicListener implements TopicListener {
         logger.trace("getFromMessageRouter {}", topicUrl);
         return dmaapRestClient.get(topicUrl) //
                 .filter(body -> body.length() > 3) // DMAAP will return "[]" sometimes. That is thrown away.
-                .flatMapMany(this::splitArray) //
+                .flatMapMany(this::splitJsonArray) //
                 .doOnNext(message -> logger.debug("Message from DMAAP topic: {} : {}", topicUrl, message)) //
                 .onErrorResume(this::handleDmaapErrorResponse); //
     }
 
-    private Flux<String> splitArray(String body) {
-        Collection<String> messages = gson.fromJson(body, LinkedList.class);
-        return Flux.fromIterable(messages);
+    private Flux<String> splitJsonArray(String body) {
+        String[] messages = gson.fromJson(body, String[].class);
+        return Flux.fromArray(messages);
     }
 
 }

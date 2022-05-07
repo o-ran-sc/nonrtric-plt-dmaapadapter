@@ -32,6 +32,7 @@ import lombok.Getter;
 
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
+import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
 import org.oran.dmaapadapter.exceptions.ServiceException;
@@ -70,8 +71,10 @@ public class ProducerRegstrationTask {
     private boolean isRegisteredInIcs = false;
     private static final int REGISTRATION_SUPERVISION_INTERVAL_MS = 1000 * 10;
 
-    public ProducerRegstrationTask(@Autowired ApplicationConfig applicationConfig, @Autowired InfoTypes types) {
-        AsyncRestClientFactory restClientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig());
+    public ProducerRegstrationTask(@Autowired ApplicationConfig applicationConfig, @Autowired InfoTypes types,
+            @Autowired SecurityContext securityContext) {
+        AsyncRestClientFactory restClientFactory =
+                new AsyncRestClientFactory(applicationConfig.getWebClientConfig(), securityContext);
         this.restClient = restClientFactory.createRestClientNoHttpProxy("");
         this.applicationConfig = applicationConfig;
         this.types = types;

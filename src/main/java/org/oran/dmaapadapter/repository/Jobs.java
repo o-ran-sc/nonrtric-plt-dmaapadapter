@@ -29,6 +29,7 @@ import java.util.Vector;
 
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
+import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.repository.Job.Parameters;
@@ -53,8 +54,8 @@ public class Jobs {
     private final AsyncRestClientFactory restclientFactory;
     private final List<Observer> observers = new ArrayList<>();
 
-    public Jobs(@Autowired ApplicationConfig applicationConfig) {
-        restclientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig());
+    public Jobs(@Autowired ApplicationConfig applicationConfig, @Autowired SecurityContext securityContext) {
+        restclientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig(), securityContext);
     }
 
     public synchronized Job getJob(String id) throws ServiceException {

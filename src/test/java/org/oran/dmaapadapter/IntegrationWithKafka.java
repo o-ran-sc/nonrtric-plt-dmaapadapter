@@ -39,6 +39,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
+import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.ImmutableHttpProxyConfig;
 import org.oran.dmaapadapter.configuration.ImmutableWebClientConfig;
@@ -98,6 +99,9 @@ class IntegrationWithKafka {
 
     @Autowired
     private TopicListeners topicListeners;
+
+    @Autowired
+    private SecurityContext securityContext;
 
     private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
 
@@ -171,7 +175,7 @@ class IntegrationWithKafka {
                 .trustStorePassword(config.trustStorePassword()) //
                 .httpProxyConfig(httpProxyConfig).build();
 
-        AsyncRestClientFactory restClientFactory = new AsyncRestClientFactory(config);
+        AsyncRestClientFactory restClientFactory = new AsyncRestClientFactory(config, securityContext);
         return restClientFactory.createRestClientNoHttpProxy(baseUrl());
     }
 
@@ -237,7 +241,6 @@ class IntegrationWithKafka {
                 .blockLast();
 
         sender.close();
-
     }
 
     private void verifiedReceivedByConsumer(String... strings) {

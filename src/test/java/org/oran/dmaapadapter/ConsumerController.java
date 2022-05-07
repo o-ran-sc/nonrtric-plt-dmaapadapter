@@ -31,6 +31,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.oran.dmaapadapter.controllers.VoidResponse;
 import org.slf4j.Logger;
@@ -40,6 +41,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController("ConsumerSimulatorController")
@@ -54,6 +56,9 @@ public class ConsumerController {
 
         public List<String> receivedBodies = Collections.synchronizedList(new ArrayList<String>());
 
+        public List<Map<String, String>> receivedHeaders =
+                Collections.synchronizedList(new ArrayList<Map<String, String>>());
+
         public TestResults() {}
 
         public boolean hasReceived(String str) {
@@ -67,6 +72,7 @@ public class ConsumerController {
 
         public void reset() {
             receivedBodies.clear();
+            receivedHeaders.clear();
         }
     }
 
@@ -78,9 +84,10 @@ public class ConsumerController {
             @ApiResponse(responseCode = "200", description = "OK", //
                     content = @Content(schema = @Schema(implementation = VoidResponse.class))) //
     })
-    public ResponseEntity<Object> postData(@RequestBody String body) {
+    public ResponseEntity<Object> postData(@RequestBody String body, @RequestHeader Map<String, String> headers) {
         logger.info("Received by consumer: {}", body);
         testResults.receivedBodies.add(body);
+        testResults.receivedHeaders.add(headers);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
