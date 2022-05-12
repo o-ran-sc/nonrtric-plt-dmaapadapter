@@ -98,12 +98,12 @@ public class ApplicationConfig {
 
     public WebClientConfig getWebClientConfig() {
         if (this.webClientConfig == null) {
-            HttpProxyConfig httpProxyConfig = ImmutableHttpProxyConfig.builder() //
+            HttpProxyConfig httpProxyConfig = HttpProxyConfig.builder() //
                     .httpProxyHost(this.httpProxyHost) //
                     .httpProxyPort(this.httpProxyPort) //
                     .build();
 
-            this.webClientConfig = ImmutableWebClientConfig.builder() //
+            this.webClientConfig = WebClientConfig.builder() //
                     .keyStoreType(this.sslKeyStoreType) //
                     .keyStorePassword(this.sslKeyStorePassword) //
                     .keyStore(this.sslKeyStore) //

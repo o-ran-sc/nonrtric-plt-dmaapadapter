@@ -25,9 +25,6 @@ import com.google.gson.annotations.SerializedName;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import org.immutables.gson.Gson;
-
-@Gson.TypeAdapters
 @Schema(name = "producer_info_job_request",
         description = "The body of the Information Producer callbacks for Information Job creation and deletion")
 public class ProducerJobInfo {

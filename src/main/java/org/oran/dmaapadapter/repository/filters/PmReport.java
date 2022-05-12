@@ -20,17 +20,14 @@
 
 package org.oran.dmaapadapter.repository.filters;
 
+
 import java.util.ArrayList;
 import java.util.Collection;
 
-import org.immutables.gson.Gson;
-
-@Gson.TypeAdapters
 class PmReport {
 
     Event event = new Event();
 
-    @Gson.TypeAdapters
     public static class CommonEventHeader {
         String domain;
         String eventId;
@@ -46,12 +43,10 @@ class PmReport {
         String timeZoneOffset;
     }
 
-    @Gson.TypeAdapters
     public static class MeasInfoId {
         String sMeasInfoId;
     }
 
-    @Gson.TypeAdapters
     public static class MeasTypes {
         public String getMeasType(int pValue) {
             if (pValue > sMeasTypesList.size()) {
@@ -63,13 +58,11 @@ class PmReport {
         protected ArrayList<String> sMeasTypesList = new ArrayList<>();
     }
 
-    @Gson.TypeAdapters
     public static class MeasResult {
         int p;
         String sValue;
     }
 
-    @Gson.TypeAdapters
     public static class MeasValuesList {
         String measObjInstId;
         String suspectFlag;
@@ -83,7 +76,6 @@ class PmReport {
         }
     }
 
-    @Gson.TypeAdapters
     public static class MeasInfoList {
         MeasInfoId measInfoId;
         MeasTypes measTypes;
@@ -97,7 +89,6 @@ class PmReport {
         }
     }
 
-    @Gson.TypeAdapters
     public static class MeasDataCollection {
         int granularityPeriod;
         String measuredEntityUserName;
@@ -106,13 +97,11 @@ class PmReport {
         Collection<MeasInfoList> measInfoList = new ArrayList<>();
     }
 
-    @Gson.TypeAdapters
     public static class Perf3gppFields {
         String perf3gppFieldsVersion;
         MeasDataCollection measDataCollection;
     }
 
-    @Gson.TypeAdapters
     public static class Event {
         CommonEventHeader commonEventHeader;
         Perf3gppFields perf3gppFields;

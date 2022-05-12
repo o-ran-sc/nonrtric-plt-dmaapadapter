@@ -44,8 +44,6 @@ import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
 import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
-import org.oran.dmaapadapter.configuration.ImmutableHttpProxyConfig;
-import org.oran.dmaapadapter.configuration.ImmutableWebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
@@ -172,18 +170,18 @@ class ApplicationTest {
 
     private AsyncRestClient restClient(boolean useTrustValidation) {
         WebClientConfig config = this.applicationConfig.getWebClientConfig();
-        HttpProxyConfig httpProxyConfig = ImmutableHttpProxyConfig.builder() //
+        HttpProxyConfig httpProxyConfig = HttpProxyConfig.builder() //
                 .httpProxyHost("") //
                 .httpProxyPort(0) //
                 .build();
-        config = ImmutableWebClientConfig.builder() //
-                .keyStoreType(config.keyStoreType()) //
-                .keyStorePassword(config.keyStorePassword()) //
-                .keyStore(config.keyStore()) //
-                .keyPassword(config.keyPassword()) //
+        config = WebClientConfig.builder() //
+                .keyStoreType(config.getKeyStoreType()) //
+                .keyStorePassword(config.getKeyStorePassword()) //
+                .keyStore(config.getKeyStore()) //
+                .keyPassword(config.getKeyPassword()) //
                 .isTrustStoreUsed(useTrustValidation) //
-                .trustStore(config.trustStore()) //
-                .trustStorePassword(config.trustStorePassword()) //
+                .trustStore(config.getTrustStore()) //
+                .trustStorePassword(config.getTrustStorePassword()) //
                 .httpProxyConfig(httpProxyConfig).build();
 
         AsyncRestClientFactory restClientFactory = new AsyncRestClientFactory(config, securityContext);

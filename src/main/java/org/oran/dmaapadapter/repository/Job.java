@@ -28,7 +28,6 @@ import java.time.Duration;
 import lombok.Getter;
 import lombok.Setter;
 
-import org.immutables.gson.Gson;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.repository.filters.Filter;
 import org.oran.dmaapadapter.repository.filters.JsltFilter;
@@ -43,7 +42,6 @@ public class Job {
     private static com.google.gson.Gson gson = new GsonBuilder().create();
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-    @Gson.TypeAdapters
     public static class Parameters {
         public static final String REGEXP_TYPE = "regexp";
         public static final String PM_FILTER_TYPE = "pmdata";
@@ -102,7 +100,6 @@ public class Job {
         }
     }
 
-    @Gson.TypeAdapters
     public static class BufferTimeout {
         public BufferTimeout(int maxSize, long maxTimeMiliseconds) {
             this.maxSize = maxSize;

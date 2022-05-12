@@ -22,9 +22,6 @@ package org.oran.dmaapadapter.controllers;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import org.immutables.gson.Gson;
-
-@Gson.TypeAdapters
 @Schema(name = "void", description = "Void/empty")
 public class VoidResponse {
     private VoidResponse() {}

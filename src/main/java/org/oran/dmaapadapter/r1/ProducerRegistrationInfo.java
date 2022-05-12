@@ -29,10 +29,7 @@ import java.util.Collection;
 
 import lombok.Builder;
 
-import org.immutables.gson.Gson;
-
 @Builder
-@Gson.TypeAdapters
 @Schema(name = "producer_registration_info", description = "Information for an Information Producer")
 public class ProducerRegistrationInfo {
 

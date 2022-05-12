@@ -20,6 +20,7 @@
 
 package org.oran.dmaapadapter.repository.filters;
 
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -27,7 +28,6 @@ import java.util.Map;
 
 import lombok.Getter;
 
-import org.immutables.gson.Gson;
 import org.thymeleaf.util.StringUtils;
 
 public class PmReportFilter implements Filter {
@@ -35,7 +35,6 @@ public class PmReportFilter implements Filter {
     private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
     private final FilterData filterData;
 
-    @Gson.TypeAdapters
     @Getter
     public static class FilterData {
         Collection<String> sourceNames = new ArrayList<>();

@@ -52,8 +52,8 @@ public class DmaapTopicListener implements TopicListener {
     private Disposable topicReceiverTask;
 
     public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type, SecurityContext securityContext) {
-        AsyncRestClientFactory restclientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig(),
-                securityContext);
+        AsyncRestClientFactory restclientFactory =
+                new AsyncRestClientFactory(applicationConfig.getWebClientConfig(), securityContext);
         this.dmaapRestClient = restclientFactory.createRestClientNoHttpProxy("");
         this.applicationConfig = applicationConfig;
         this.type = type;
