@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "ce0b7119_edbde084",
+        "filename": "src/main/java/org/oran/dmaapadapter/configuration/WebClientConfig.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 1000201
+      },
+      "writtenOn": "2022-05-12T14:46:18Z",
+      "side": 1,
+      "message": "Is it possible to get this redacted, as it was before?",
+      "range": {
+        "startLine": 36,
+        "startChar": 19,
+        "endLine": 36,
+        "endChar": 30
+      },
+      "revId": "21ac43a24513ffa4a6554942d5965004b463c3fa",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6c3645c2_bd2f52c8",
+        "filename": "src/main/java/org/oran/dmaapadapter/configuration/WebClientConfig.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 1000201
+      },
+      "writtenOn": "2022-05-12T14:46:18Z",
+      "side": 1,
+      "message": "Is it possible to get this redacted, as it was before?",
+      "range": {
+        "startLine": 40,
+        "startChar": 19,
+        "endLine": 40,
+        "endChar": 37
+      },
+      "revId": "21ac43a24513ffa4a6554942d5965004b463c3fa",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    }
+  ]
+}
