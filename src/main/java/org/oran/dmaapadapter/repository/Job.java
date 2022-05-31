@@ -27,6 +27,7 @@ import java.time.Duration;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.repository.filters.Filter;
@@ -37,6 +38,7 @@ import org.oran.dmaapadapter.repository.filters.RegexpFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@ToString
 public class Job {
 
     private static com.google.gson.Gson gson = new GsonBuilder().create();

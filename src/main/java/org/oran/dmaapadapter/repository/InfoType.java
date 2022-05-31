@@ -21,9 +21,11 @@
 package org.oran.dmaapadapter.repository;
 
 import lombok.Getter;
+import lombok.ToString;
 
 import org.springframework.util.StringUtils;
 
+@ToString
 public class InfoType {
 
     @Getter

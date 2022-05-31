@@ -22,10 +22,12 @@ package org.oran.dmaapadapter.configuration;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.ToString;
 import reactor.netty.transport.ProxyProvider;
 
 @Builder
 @Getter
+@ToString
 public class WebClientConfig {
     private String keyStoreType;
 
@@ -33,14 +35,17 @@ public class WebClientConfig {
 
     private String keyStore;
 
+    @ToString.Exclude
     private String keyPassword;
 
     private boolean isTrustStoreUsed;
 
+    @ToString.Exclude
     private String trustStorePassword;
 
     private String trustStore;
 
+    @ToString
     @Builder
     @Getter
     public static class HttpProxyConfig {

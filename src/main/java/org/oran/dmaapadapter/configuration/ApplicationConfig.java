@@ -29,6 +29,7 @@ import java.util.Collections;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
 import org.oran.dmaapadapter.repository.InfoType;
@@ -38,6 +39,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @EnableConfigurationProperties
+@ToString
 public class ApplicationConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
