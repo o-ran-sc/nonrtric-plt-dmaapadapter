@@ -92,7 +92,8 @@ public class JobDataConsumer {
 
     private Mono<String> postToClient(String body) {
         logger.debug("Sending to consumer {} {} {}", job.getId(), job.getCallbackUrl(), body);
-        MediaType contentType = this.job.isBuffered() ? MediaType.APPLICATION_JSON : null;
+        MediaType contentType =
+                this.job.isBuffered() || this.job.getType().isJson() ? MediaType.APPLICATION_JSON : null;
         return job.getConsumerRestClient().post("", body, contentType);
     }
 
@@ -112,13 +113,17 @@ public class JobDataConsumer {
                 .filter(t -> !t.isEmpty()); //
 
         if (job.isBuffered()) {
-            result = result.map(this::quote) //
+            result = result.map(str -> quoteNonJson(str, job)) //
                     .bufferTimeout( //
                             job.getParameters().getBufferTimeout().getMaxSize(), //
                             job.getParameters().getBufferTimeout().getMaxTime()) //
                     .map(Object::toString);
         }
         return result;
+    }
+
+    private String quoteNonJson(String str, Job job) {
+        return job.getType().isJson() ? str : quote(str);
     }
 
     private String quote(String str) {

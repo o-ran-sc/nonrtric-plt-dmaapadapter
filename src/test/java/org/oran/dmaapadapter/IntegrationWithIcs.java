@@ -272,13 +272,13 @@ class IntegrationWithIcs {
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
-        DmaapSimulatorController.addResponse("DmaapResponse1");
-        DmaapSimulatorController.addResponse("DmaapResponse2");
-        DmaapSimulatorController.addResponse("Junk");
+        DmaapSimulatorController.addResponse("[\"DmaapResponse1\"]");
+        DmaapSimulatorController.addResponse("[\"DmaapResponse2\"]");
 
         ConsumerController.TestResults results = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(results.receivedBodies).hasSize(2));
         assertThat(results.receivedBodies.get(0)).isEqualTo("DmaapResponse1");
+        assertThat(results.receivedHeaders.get(0)).containsEntry("content-type", "text/plain;charset=UTF-8");
 
         deleteInformationJobInIcs(DMAAP_JOB_ID);
 

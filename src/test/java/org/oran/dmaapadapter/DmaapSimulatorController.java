@@ -59,7 +59,7 @@ public class DmaapSimulatorController {
     }
 
     public static void addResponse(String response) {
-        dmaapResponses.add("[" + quote(response) + "]");
+        dmaapResponses.add(response);
     }
 
     private static String quote(String str) {

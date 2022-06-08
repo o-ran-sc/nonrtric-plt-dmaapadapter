@@ -20,11 +20,10 @@
 
 package org.oran.dmaapadapter.repository.filters;
 
-
 import java.util.ArrayList;
 import java.util.Collection;
 
-class PmReport {
+public class PmReport {
 
     Event event = new Event();
 

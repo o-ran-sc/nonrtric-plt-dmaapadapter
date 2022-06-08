@@ -42,12 +42,17 @@ public class InfoType {
 
     private final String dataType;
 
-    public InfoType(String id, String dmaapTopicUrl, boolean useHttpProxy, String kafkaInputTopic, String dataType) {
+    @Getter
+    private boolean isJson = false;
+
+    public InfoType(String id, String dmaapTopicUrl, boolean useHttpProxy, String kafkaInputTopic, String dataType,
+            boolean isJson) {
         this.id = id;
         this.dmaapTopicUrl = dmaapTopicUrl;
         this.useHttpProxy = useHttpProxy;
         this.kafkaInputTopic = kafkaInputTopic;
         this.dataType = dataType;
+        this.isJson = isJson;
     }
 
     public boolean isKafkaTopicDefined() {
