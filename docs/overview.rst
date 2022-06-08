@@ -46,6 +46,13 @@ Each entry will be registered as a subscribe information type in ICS. The follow
 
 * dataType, this can be set to "pmData" which gives a possibility to perform a special filtering of PM data.
 
+* isJson, this indicates that the received is Json objects (from Kafka a stream of objects and from DMaaP an array of quoted json objects).
+  Default value is false.
+  If the received data is Json objects, the data sent to the consumer does not need to be quoted.
+  When buffering is used the output will be an array of json objects '[{},{}]' as opposed to an array of strings '["string1", "string2"]'.
+  When buffering is not used, the output content-type will be 'application/json' as opposed to 'text/plain'. When buffering is used, the
+  output content-type will 'application/json' regardless of this parameter.
+
 These parameters will be used to choose which parameter schemas that defines which parameters that can be used when creating an information job/data subscription.
 
 Below follows an example of a configuration file.
@@ -57,7 +64,8 @@ Below follows an example of a configuration file.
           {
              "id": "DmaapInformationType",
              "dmaapTopicUrl": "/dmaap-topic-1",
-             "useHttpProxy": true
+             "useHttpProxy": true,
+             "isJson" : true
           },
           {
              "id": "KafkaInformationType",
@@ -66,7 +74,8 @@ Below follows an example of a configuration file.
           {
              "id": "PmInformationType",
              "dmaapTopicUrl": "/dmaap-topic-2",
-             "dataType": "PmData"
+             "dataType": "PmData",
+             "isJson" : true
           }
        ]
     }

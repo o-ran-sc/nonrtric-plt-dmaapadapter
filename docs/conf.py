@@ -4,6 +4,8 @@ from docs_conf.conf import *
 
 branch = 'latest'
 
+language = 'en'
+
 linkcheck_ignore = [
     'http://localhost.*',
     'http://127.0.0.1.*',
