@@ -1,0 +1,10 @@
+---
+distribution_type: container
+container_release_tag: 1.1.0
+container_pull_registry: nexus3.o-ran-sc.org:10004
+container_push_registry: nexus3.o-ran-sc.org:10002
+project: nonrtric
+ref: 2b459a10f633fcab733fb1bb188a83f200351327
+containers:
+    - name: nonrtric-plt-dmaapadapter
+      version: 1.1.0
