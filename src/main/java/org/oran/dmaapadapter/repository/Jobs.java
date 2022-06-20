@@ -20,6 +20,8 @@
 
 package org.oran.dmaapadapter.repository;
 
+import com.google.common.base.Strings;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -71,7 +73,11 @@ public class Jobs {
     }
 
     public void addJob(String id, String callbackUrl, InfoType type, String owner, String lastUpdated,
-            Parameters parameters) {
+            Parameters parameters) throws ServiceException {
+
+        if (!Strings.isNullOrEmpty(parameters.getKafkaOutputTopic()) && !Strings.isNullOrEmpty(callbackUrl)) {
+            throw new ServiceException("Cannot deliver to both Kafka and HTTP in the same job", HttpStatus.BAD_REQUEST);
+        }
         AsyncRestClient consumerRestClient = type.isUseHttpProxy() //
                 ? restclientFactory.createRestClientUseHttpProxy(callbackUrl) //
                 : restclientFactory.createRestClientNoHttpProxy(callbackUrl);

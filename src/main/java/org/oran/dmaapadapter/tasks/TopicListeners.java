@@ -25,6 +25,7 @@ import java.util.Map;
 
 import lombok.Getter;
 
+import org.apache.logging.log4j.util.Strings;
 import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.repository.InfoType;
@@ -49,13 +50,15 @@ public class TopicListeners {
     private final Map<String, TopicListener> dmaapTopicListeners = new HashMap<>(); // Key is typeId
 
     @Getter
-    private final MultiMap<JobDataConsumer> kafkaConsumers = new MultiMap<>(); // Key is typeId, jobId
-    private final MultiMap<JobDataConsumer> dmaapConsumers = new MultiMap<>(); // Key is typeId, jobId
+    private final MultiMap<DataConsumer> dataConsumers = new MultiMap<>(); // Key is typeId, jobId
+
+    private final ApplicationConfig appConfig;
 
     private static final int CONSUMER_SUPERVISION_INTERVAL_MS = 1000 * 60 * 3;
 
     public TopicListeners(@Autowired ApplicationConfig appConfig, @Autowired InfoTypes types, @Autowired Jobs jobs,
             @Autowired SecurityContext securityContext) {
+        this.appConfig = appConfig;
 
         for (InfoType type : types.getAll()) {
             if (type.isKafkaTopicDefined()) {
@@ -85,32 +88,35 @@ public class TopicListeners {
         removeJob(job);
         logger.debug("Job added {}", job.getId());
         if (job.getType().isKafkaTopicDefined()) {
-            addJob(job, kafkaConsumers, kafkaTopicListeners);
+            addConsumer(job, dataConsumers, kafkaTopicListeners);
         }
 
         if (job.getType().isDmaapTopicDefined()) {
-            addJob(job, dmaapConsumers, dmaapTopicListeners);
+            addConsumer(job, dataConsumers, dmaapTopicListeners);
         }
     }
 
-    private static void addJob(Job job, MultiMap<JobDataConsumer> consumers,
-            Map<String, TopicListener> topicListeners) {
+    private DataConsumer createConsumer(Job job) {
+        return !Strings.isEmpty(job.getParameters().getKafkaOutputTopic()) ? new KafkaDataConsumer(job, appConfig)
+                : new HttpDataConsumer(job);
+    }
+
+    private void addConsumer(Job job, MultiMap<DataConsumer> consumers, Map<String, TopicListener> topicListeners) {
         TopicListener topicListener = topicListeners.get(job.getType().getId());
         if (consumers.get(job.getType().getId()).isEmpty()) {
             topicListener.start();
         }
-        JobDataConsumer subscription = new JobDataConsumer(job);
-        subscription.start(topicListener.getOutput().asFlux());
-        consumers.put(job.getType().getId(), job.getId(), subscription);
+        DataConsumer consumer = createConsumer(job);
+        consumer.start(topicListener.getOutput().asFlux());
+        consumers.put(job.getType().getId(), job.getId(), consumer);
     }
 
     public synchronized void removeJob(Job job) {
-        removeJob(job, kafkaConsumers);
-        removeJob(job, dmaapConsumers);
+        removeJob(job, dataConsumers);
     }
 
-    private static void removeJob(Job job, MultiMap<JobDataConsumer> consumers) {
-        JobDataConsumer consumer = consumers.remove(job.getType().getId(), job.getId());
+    private static void removeJob(Job job, MultiMap<DataConsumer> consumers) {
+        DataConsumer consumer = consumers.remove(job.getType().getId(), job.getId());
         if (consumer != null) {
             logger.debug("Job removed {}", job.getId());
             consumer.stop();
@@ -119,25 +125,23 @@ public class TopicListeners {
 
     @Scheduled(fixedRate = CONSUMER_SUPERVISION_INTERVAL_MS)
     public synchronized void restartNonRunningKafkaTopics() {
-        for (String typeId : this.kafkaConsumers.keySet()) {
-            for (JobDataConsumer consumer : this.kafkaConsumers.get(typeId)) {
-                if (!consumer.isRunning()) {
-                    restartTopicAndConsumers(this.kafkaTopicListeners, this.kafkaConsumers, consumer);
-                }
+        for (DataConsumer consumer : this.dataConsumers.values()) {
+            if (!consumer.isRunning()) {
+                restartTopicAndConsumers(this.kafkaTopicListeners, this.dataConsumers, consumer);
             }
         }
+
     }
 
     private static void restartTopicAndConsumers(Map<String, TopicListener> topicListeners,
-            MultiMap<JobDataConsumer> consumers, JobDataConsumer consumer) {
+            MultiMap<DataConsumer> consumers, DataConsumer consumer) {
         InfoType type = consumer.getJob().getType();
         TopicListener topic = topicListeners.get(type.getId());
         topic.start();
         restartConsumersOfType(consumers, topic, type);
     }
 
-    private static void restartConsumersOfType(MultiMap<JobDataConsumer> consumers, TopicListener topic,
-            InfoType type) {
+    private static void restartConsumersOfType(MultiMap<DataConsumer> consumers, TopicListener topic, InfoType type) {
         consumers.get(type.getId()).forEach(consumer -> consumer.start(topic.getOutput().asFlux()));
     }
 }

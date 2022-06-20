@@ -10,8 +10,8 @@ DMaaP Adapter
 Introduction
 ************
 
-This is a generic information producer using the Information Coordination Service (ICS) Data Producer API. It can get information from DMaaP (ONAP) or directly from Kafka topics and deliver the
-information to data consumers using REST calls (POST).
+This is a generic information producer using the Information Coordination Service (ICS) Data Producer API. It can get information from DMaaP (ONAP) or directly from Kafka topics.
+The information can be filtered, transformed, aggregated and then delivered to data consumers using REST calls (POST) or via Kafka.
 
 The DMaaP Adapter registers itself as an information producer along with its information types in Information Coordination Service (ICS).
 The information types are defined in a configuration file.
@@ -25,6 +25,28 @@ The service is implemented in Java Spring Boot (DMaaP Adapter Service).
 
 .. image:: ./Architecture.png
    :width: 500pt
+
+*************
+Data Delivery
+*************
+When a data consumer creates a an Information Job, either a URL for REST callbacks, or a Kafka Topic can be given as output for the job.
+After filtering, aggregation and data transformation the data will be delivered to the output. Several data consumers can receive data from one Kafka Topic.
+
+.. image:: ./DataDelivery.png
+   :width: 500pt
+
+The output will be the same regardless if the information is received from DMaaP of from Kafka. If the data is not buffered/aggregated,
+and the output is a Kafka Stream, both the keys and the values are forwarded (after filtering/transformation).
+If the output is HTTP,only the the values are forwarded (in the HTTP body).
+
+****************
+Data Aggregation
+****************
+When an Information Job is created, a bufferTimeout can be defined for aggregation of information.
+If this feature is used, the subscribed data will be buffered and will be delivered in chunks.
+
+The data will then be wrapped in a JSON array in a manner similar to DMaaP. The type configuration can define if the received data is Json.
+If not, each object is quoted (the output will then be an array of strings). If the data type is Json, the output will be an array of Json objects.
 
 ******************
 Configuration File
@@ -91,6 +113,8 @@ The following schemas can be used by the component (are located in dmaapadapter/
 typeSchema.json
 ===============
 This schema will by default be registerred for the type. The following properties are defined:
+
+* kafkaOutputTopic, optional parameter which enables the information job to output data to a Kafka topic instead of a direct call to a data consumer. The output of a job can be directed to HTTP or to Kafka regardless if the input is retrieved from DMaaP or from Kafka.
 
 * filterType, selects the type of filtering that will be done. This can be one of: "regexp", "json-path", "jslt".
 
