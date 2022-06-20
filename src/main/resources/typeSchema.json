@@ -17,6 +17,9 @@
       "type": "integer",
       "minimum": 1
     },
+    "kafkaOutputTopic" : {
+      "type": "string"
+    },
     "bufferTimeout": {
       "type": "object",
       "properties": {

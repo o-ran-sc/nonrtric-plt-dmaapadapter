@@ -58,13 +58,18 @@ public class Job {
 
         private Integer maxConcurrency;
 
+        @Getter
+        private String kafkaOutputTopic;
+
         public Parameters() {}
 
-        public Parameters(Object filter, String filterType, BufferTimeout bufferTimeout, Integer maxConcurrency) {
+        public Parameters(Object filter, String filterType, BufferTimeout bufferTimeout, Integer maxConcurrency,
+                String kafkaOutputTopic) {
             this.filter = filter;
             this.bufferTimeout = bufferTimeout;
             this.maxConcurrency = maxConcurrency;
             this.filterType = filterType;
+            this.kafkaOutputTopic = kafkaOutputTopic;
         }
 
         public int getMaxConcurrency() {
@@ -153,7 +158,6 @@ public class Job {
         this.parameters = parameters;
         filter = createFilter(parameters);
         this.consumerRestClient = consumerRestClient;
-
     }
 
     private static Filter createFilter(Parameters parameters) {

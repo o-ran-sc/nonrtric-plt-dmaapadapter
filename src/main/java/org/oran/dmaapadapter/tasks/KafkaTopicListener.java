@@ -47,7 +47,7 @@ public class KafkaTopicListener implements TopicListener {
     private static final Logger logger = LoggerFactory.getLogger(KafkaTopicListener.class);
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
-    private Many<String> output;
+    private Many<Output> output;
     private Disposable topicReceiverTask;
 
     public KafkaTopicListener(ApplicationConfig applicationConfig, InfoType type) {
@@ -56,7 +56,7 @@ public class KafkaTopicListener implements TopicListener {
     }
 
     @Override
-    public Many<String> getOutput() {
+    public Many<Output> getOutput() {
         return this.output;
     }
 
@@ -84,7 +84,7 @@ public class KafkaTopicListener implements TopicListener {
 
     private void onReceivedData(ConsumerRecord<String, String> input) {
         logger.debug("Received from kafka topic: {} :{}", this.type.getKafkaInputTopic(), input.value());
-        output.emitNext(input.value(), Sinks.EmitFailureHandler.FAIL_FAST);
+        output.emitNext(new Output(input.key(), input.value()), Sinks.EmitFailureHandler.FAIL_FAST);
     }
 
     private void onReceivedError(Throwable t) {

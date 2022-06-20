@@ -25,7 +25,6 @@ import lombok.Getter;
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import reactor.core.Disposable;
@@ -37,8 +36,8 @@ import reactor.core.publisher.Mono;
  * owner via REST calls.
  */
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
-public class JobDataConsumer {
-    private static final Logger logger = LoggerFactory.getLogger(JobDataConsumer.class);
+public abstract class DataConsumer {
+    private static final Logger logger = LoggerFactory.getLogger(DataConsumer.class);
     @Getter
     private final Job job;
     private Disposable subscription;
@@ -70,32 +69,27 @@ public class JobDataConsumer {
         }
     }
 
-    public JobDataConsumer(Job job) {
+    protected DataConsumer(Job job) {
         this.job = job;
     }
 
-    public synchronized void start(Flux<String> input) {
+    public synchronized void start(Flux<TopicListener.Output> input) {
         stop();
         this.errorStats.resetIrrecoverableErrors();
         this.subscription = handleReceivedMessage(input, job) //
-                .flatMap(this::postToClient, job.getParameters().getMaxConcurrency()) //
+                .flatMap(this::sendToClient, job.getParameters().getMaxConcurrency()) //
                 .onErrorResume(this::handleError) //
                 .subscribe(this::handleConsumerSentOk, //
                         this::handleExceptionInStream, //
-                        () -> logger.warn("JobDataConsumer stopped jobId: {}", job.getId()));
+                        () -> logger.warn("HttpDataConsumer stopped jobId: {}", job.getId()));
     }
 
     private void handleExceptionInStream(Throwable t) {
-        logger.warn("JobDataConsumer exception: {}, jobId: {}", t.getMessage(), job.getId());
+        logger.warn("HttpDataConsumer exception: {}, jobId: {}", t.getMessage(), job.getId());
         stop();
     }
 
-    private Mono<String> postToClient(String body) {
-        logger.debug("Sending to consumer {} {} {}", job.getId(), job.getCallbackUrl(), body);
-        MediaType contentType =
-                this.job.isBuffered() || this.job.getType().isJson() ? MediaType.APPLICATION_JSON : null;
-        return job.getConsumerRestClient().post("", body, contentType);
-    }
+    protected abstract Mono<String> sendToClient(TopicListener.Output output);
 
     public synchronized void stop() {
         if (this.subscription != null) {
@@ -108,16 +102,17 @@ public class JobDataConsumer {
         return this.subscription != null;
     }
 
-    private Flux<String> handleReceivedMessage(Flux<String> input, Job job) {
-        Flux<String> result = input.map(job::filter) //
-                .filter(t -> !t.isEmpty()); //
+    private Flux<TopicListener.Output> handleReceivedMessage(Flux<TopicListener.Output> inputFlux, Job job) {
+        Flux<TopicListener.Output> result =
+                inputFlux.map(input -> new TopicListener.Output(input.key, job.filter(input.value))) //
+                        .filter(t -> !t.value.isEmpty()); //
 
         if (job.isBuffered()) {
-            result = result.map(str -> quoteNonJson(str, job)) //
+            result = result.map(input -> quoteNonJson(input.value, job)) //
                     .bufferTimeout( //
                             job.getParameters().getBufferTimeout().getMaxSize(), //
                             job.getParameters().getBufferTimeout().getMaxTime()) //
-                    .map(Object::toString);
+                    .map(buffered -> new TopicListener.Output("", buffered.toString()));
         }
         return result;
     }

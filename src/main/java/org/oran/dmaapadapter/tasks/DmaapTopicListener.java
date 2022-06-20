@@ -48,7 +48,7 @@ public class DmaapTopicListener implements TopicListener {
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
     private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
-    private Many<String> output;
+    private Many<Output> output;
     private Disposable topicReceiverTask;
 
     public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type, SecurityContext securityContext) {
@@ -60,7 +60,7 @@ public class DmaapTopicListener implements TopicListener {
     }
 
     @Override
-    public Many<String> getOutput() {
+    public Many<Output> getOutput() {
         return this.output;
     }
 
@@ -95,7 +95,7 @@ public class DmaapTopicListener implements TopicListener {
 
     private void onReceivedData(String input) {
         logger.debug("Received from DMAAP topic: {} :{}", this.type.getDmaapTopicUrl(), input);
-        output.emitNext(input, Sinks.EmitFailureHandler.FAIL_FAST);
+        output.emitNext(new Output("", input), Sinks.EmitFailureHandler.FAIL_FAST);
     }
 
     private String getDmaapUrl() {

@@ -20,12 +20,25 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import lombok.ToString;
 import reactor.core.publisher.Sinks.Many;
 
 public interface TopicListener {
+
+    @ToString
+    public static class Output {
+        public final String key;
+        public final String value;
+
+        public Output(String key, String value) {
+            this.key = key;
+            this.value = value;
+        }
+    }
+
     public void start();
 
     public void stop();
 
-    public Many<String> getOutput();
+    public Many<Output> getOutput();
 }
