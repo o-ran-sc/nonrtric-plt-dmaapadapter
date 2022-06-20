@@ -40,7 +40,6 @@ import org.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
 import org.oran.dmaapadapter.clients.SecurityContext;
@@ -55,8 +54,9 @@ import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
 import org.oran.dmaapadapter.repository.filters.PmReport;
 import org.oran.dmaapadapter.repository.filters.PmReportFilter;
-import org.oran.dmaapadapter.tasks.JobDataConsumer;
+import org.oran.dmaapadapter.tasks.DataConsumer;
 import org.oran.dmaapadapter.tasks.ProducerRegstrationTask;
+import org.oran.dmaapadapter.tasks.TopicListener;
 import org.oran.dmaapadapter.tasks.TopicListeners;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -70,14 +70,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-@ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = { //
         "server.ssl.key-store=./config/keystore.jks", //
@@ -283,18 +281,18 @@ class ApplicationTest {
         waitForRegistration();
 
         // Create a job
-        Job.Parameters param = new Job.Parameters(null, null, new Job.BufferTimeout(123, 456), 1);
+        Job.Parameters param = new Job.Parameters(null, null, new Job.BufferTimeout(123, 456), 1, null);
         String targetUri = baseUrl() + ConsumerController.CONSUMER_TARGET_URL;
         ConsumerJobInfo kafkaJobInfo = new ConsumerJobInfo(TYPE_ID, toJson(gson.toJson(param)), "owner", targetUri, "");
 
         this.icsSimulatorController.addJob(kafkaJobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
-        JobDataConsumer kafkaConsumer = this.topicListeners.getKafkaConsumers().get(TYPE_ID, JOB_ID);
+        DataConsumer kafkaConsumer = this.topicListeners.getDataConsumers().get(TYPE_ID, JOB_ID);
 
         // Handle received data from Kafka, check that it has been posted to the
         // consumer
-        kafkaConsumer.start(Flux.just("data"));
+        kafkaConsumer.start(Flux.just(new TopicListener.Output("key", "data")));
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
@@ -318,7 +316,7 @@ class ApplicationTest {
         waitForRegistration();
 
         // Create a job
-        Job.Parameters param = new Job.Parameters(null, null, new Job.BufferTimeout(123, 456), 1);
+        Job.Parameters param = new Job.Parameters(null, null, new Job.BufferTimeout(123, 456), 1, null);
         ConsumerJobInfo jobInfo = consumerJobInfo("DmaapInformationType", JOB_ID, toJson(gson.toJson(param)));
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
@@ -348,7 +346,7 @@ class ApplicationTest {
         waitForRegistration();
 
         // Create a job
-        Job.Parameters param = new Job.Parameters(null, null, null, 1);
+        Job.Parameters param = new Job.Parameters(null, null, null, 1, null);
         ConsumerJobInfo jobInfo = consumerJobInfo("DmaapInformationType", JOB_ID, toJson(gson.toJson(param)));
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
@@ -386,7 +384,7 @@ class ApplicationTest {
         filterData.getSourceNames().add("O-DU-1122");
         filterData.getMeasuredEntityDns().add("ManagedElement=RNC-Gbg-1");
         Job.Parameters param = new Job.Parameters(filterData, Job.Parameters.PM_FILTER_TYPE,
-                new Job.BufferTimeout(123, 456), null);
+                new Job.BufferTimeout(123, 456), null, null);
         String paramJson = gson.toJson(param);
         ConsumerJobInfo jobInfo = consumerJobInfo("PmInformationType", "EI_PM_JOB_ID", toJson(paramJson));
 
@@ -420,7 +418,7 @@ class ApplicationTest {
         // Create a job with a PM filter
         String expresssion = "if(.event.commonEventHeader.sourceName == \"O-DU-1122\")" //
                 + ".";
-        Job.Parameters param = new Job.Parameters(expresssion, Job.Parameters.JSLT_FILTER_TYPE, null, null);
+        Job.Parameters param = new Job.Parameters(expresssion, Job.Parameters.JSLT_FILTER_TYPE, null, null, null);
         String paramJson = gson.toJson(param);
         ConsumerJobInfo jobInfo = consumerJobInfo("PmInformationType", JOB_ID, toJson(paramJson));
 
@@ -517,7 +515,7 @@ class ApplicationTest {
         // Create a job with a PM filter
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.getMeasTypes().add("succImmediateAssignProcs");
-        Job.Parameters param = new Job.Parameters(filterData, Job.Parameters.PM_FILTER_TYPE, null, null);
+        Job.Parameters param = new Job.Parameters(filterData, Job.Parameters.PM_FILTER_TYPE, null, null, null);
         String paramJson = gson.toJson(param);
 
         ConsumerJobInfo jobInfo = consumerJobInfo("PmInformationTypeKafka", "EI_PM_JOB_ID", toJson(paramJson));

@@ -27,28 +27,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonParser;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.IntegerSerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
 import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
+import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.r1.ConsumerJobInfo;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
-import org.oran.dmaapadapter.tasks.JobDataConsumer;
+import org.oran.dmaapadapter.tasks.DataConsumer;
+import org.oran.dmaapadapter.tasks.KafkaTopicListener;
+import org.oran.dmaapadapter.tasks.TopicListener;
 import org.oran.dmaapadapter.tasks.TopicListeners;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,15 +63,14 @@ import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.boot.web.servlet.server.ServletWebServerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderOptions;
 import reactor.kafka.sender.SenderRecord;
 
 @SuppressWarnings("java:S3577") // Rename class
-@ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = WebEnvironment.DEFINED_PORT)
 @TestPropertySource(properties = { //
         "server.ssl.key-store=./config/keystore.jks", //
@@ -103,7 +104,7 @@ class IntegrationWithKafka {
 
     private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
 
-    private static final Logger logger = LoggerFactory.getLogger(IntegrationWithKafka.class);
+    private final Logger logger = LoggerFactory.getLogger(IntegrationWithKafka.class);
 
     @LocalServerPort
     int localServerHttpPort;
@@ -187,8 +188,8 @@ class IntegrationWithKafka {
 
     private static Object jobParametersAsJsonObject(String filter, long maxTimeMiliseconds, int maxSize,
             int maxConcurrency) {
-        Job.Parameters param = new Job.Parameters(filter, Job.Parameters.REGEXP_TYPE,
-                new Job.BufferTimeout(maxSize, maxTimeMiliseconds), maxConcurrency);
+        Job.BufferTimeout buffer = maxSize > 0 ? new Job.BufferTimeout(maxSize, maxTimeMiliseconds) : null;
+        Job.Parameters param = new Job.Parameters(filter, Job.Parameters.REGEXP_TYPE, buffer, maxConcurrency, null);
         String str = gson.toJson(param);
         return jsonObject(str);
     }
@@ -212,27 +213,39 @@ class IntegrationWithKafka {
         }
     }
 
-    private SenderOptions<Integer, String> senderOptions() {
+    ConsumerJobInfo consumerJobInfoKafka(String topic) {
+        try {
+            Job.Parameters param = new Job.Parameters(null, null, null, 1, topic);
+            String str = gson.toJson(param);
+            Object parametersObj = jsonObject(str);
+
+            return new ConsumerJobInfo(TYPE_ID, parametersObj, "owner", null, "");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private SenderOptions<String, String> senderOptions() {
         String bootstrapServers = this.applicationConfig.getKafkaBootStrapServers();
 
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.CLIENT_ID_CONFIG, "sample-producerx");
         props.put(ProducerConfig.ACKS_CONFIG, "all");
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         return SenderOptions.create(props);
     }
 
-    private SenderRecord<Integer, String, Integer> senderRecord(String data) {
+    private SenderRecord<String, String, Integer> senderRecord(String data) {
         final InfoType infoType = this.types.get(TYPE_ID);
-        int key = 1;
+        String key = "Key " + Instant.now();
         int correlationMetadata = 2;
         return SenderRecord.create(new ProducerRecord<>(infoType.getKafkaInputTopic(), key, data), correlationMetadata);
     }
 
-    private void sendDataToStream(Flux<SenderRecord<Integer, String, Integer>> dataToSend) {
-        final KafkaSender<Integer, String> sender = KafkaSender.create(senderOptions());
+    private void sendDataToStream(Flux<SenderRecord<String, String, Integer>> dataToSend) {
+        final KafkaSender<String, String> sender = KafkaSender.create(senderOptions());
 
         sender.send(dataToSend) //
                 .doOnError(e -> logger.error("Send failed", e)) //
@@ -274,7 +287,47 @@ class IntegrationWithKafka {
         this.icsSimulatorController.deleteJob(JOB_ID, restClient());
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
-        await().untilAsserted(() -> assertThat(this.topicListeners.getKafkaConsumers().keySet()).isEmpty());
+        await().untilAsserted(() -> assertThat(this.topicListeners.getDataConsumers().keySet()).isEmpty());
+    }
+
+    TopicListener.Output receivedKafkaOutput = new TopicListener.Output("", "");
+
+    @Test
+    void sendToKafkaConsumer() throws ServiceException, InterruptedException {
+        final String JOB_ID = "ID";
+
+        // Register producer, Register types
+        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
+        assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
+
+        final String OUTPUT_TOPIC = "outputTopic";
+
+        this.icsSimulatorController.addJob(consumerJobInfoKafka(OUTPUT_TOPIC), JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+
+        // Create a listener to the output topic. The KafkaTopicListener happens to be
+        // suitable for that,
+        InfoType type = new InfoType("id", null, false, OUTPUT_TOPIC, "dataType", false);
+        KafkaTopicListener receiver = new KafkaTopicListener(this.applicationConfig, type);
+        receiver.start();
+
+        Disposable disponsable = receiver.getOutput().asFlux() //
+                .doOnNext(output -> {
+                    receivedKafkaOutput = output;
+                    logger.info("*** recived {}, {}", OUTPUT_TOPIC, output);
+                }) //
+                .doFinally(sig -> logger.info("Finally " + sig)) //
+                .subscribe();
+
+        String sendString = "testData " + Instant.now();
+        var dataToSend = Flux.just(senderRecord(sendString));
+        sleep(4000);
+        sendDataToStream(dataToSend);
+
+        await().untilAsserted(() -> assertThat(this.receivedKafkaOutput.value).isEqualTo(sendString));
+
+        disponsable.dispose();
+        receiver.stop();
     }
 
     @Test
@@ -304,7 +357,7 @@ class IntegrationWithKafka {
         this.icsSimulatorController.deleteJob(JOB_ID2, restClient());
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
-        await().untilAsserted(() -> assertThat(this.topicListeners.getKafkaConsumers().keySet()).isEmpty());
+        await().untilAsserted(() -> assertThat(this.topicListeners.getDataConsumers().keySet()).isEmpty());
     }
 
     @Test
@@ -326,7 +379,7 @@ class IntegrationWithKafka {
         var dataToSend = Flux.range(1, 1000000).map(i -> senderRecord("Message_" + i)); // Message_1, Message_2 etc.
         sendDataToStream(dataToSend); // this should overflow
 
-        JobDataConsumer consumer = topicListeners.getKafkaConsumers().get(TYPE_ID).iterator().next();
+        DataConsumer consumer = topicListeners.getDataConsumers().get(TYPE_ID).iterator().next();
         await().untilAsserted(() -> assertThat(consumer.isRunning()).isFalse());
         this.consumerController.testResults.reset();
 
@@ -344,7 +397,7 @@ class IntegrationWithKafka {
         this.icsSimulatorController.deleteJob(JOB_ID2, restClient());
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
-        await().untilAsserted(() -> assertThat(this.topicListeners.getKafkaConsumers().keySet()).isEmpty());
+        await().untilAsserted(() -> assertThat(this.topicListeners.getDataConsumers().keySet()).isEmpty());
     }
 
 }
