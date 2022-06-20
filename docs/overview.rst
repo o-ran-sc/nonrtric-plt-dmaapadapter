@@ -10,8 +10,8 @@ DMaaP Adapter
 Introduction
 ************
 
-This is a generic information producer using the Information Coordination Service (ICS) Data Producer API. It can get information from DMaaP (ONAP) or directly from Kafka topics and deliver the
-information to data consumers using REST calls (POST).
+This is a generic information producer using the Information Coordination Service (ICS) Data Producer API. It can get information from DMaaP (ONAP) or directly from Kafka topics.
+The information can be filtered, transformed, aggregated and then delivered to data consumers using REST calls (POST) or via Kafka.
 
 The DMaaP Adapter registers itself as an information producer along with its information types in Information Coordination Service (ICS).
 The information types are defined in a configuration file.
@@ -24,6 +24,16 @@ So, a data consumer may be decoupled from DMaaP and/or Kafka this way.
 The service is implemented in Java Spring Boot (DMaaP Adapter Service).
 
 .. image:: ./Architecture.png
+   :width: 500pt
+
+*************
+Data Delivery
+*************
+When a data consumer creates a an Information Job, either a URL for REST callbacks, or a Kafka Topic can be given as output for the job. 
+After filtering, aggregation and data transnformation the data will be delivered to the output. Several data consumers can receive data from one 
+Kafka Topic.
+
+.. image:: ./DataDelivery.png
    :width: 500pt
 
 ******************
@@ -91,6 +101,8 @@ The following schemas can be used by the component (are located in dmaapadapter/
 typeSchema.json
 ===============
 This schema will by default be registerred for the type. The following properties are defined:
+
+* kafkaOutputTopic, optional parameter which enables that the Information Job will output the data to a Kafka topic instead of a direct call to one data consumer. The output of a job can be directed to HTTP or to Kafka regardless if the input is retrieved from DMaaP or from Kafka.
 
 * filterType, selects the type of filtering that will be done. This can be one of: "regexp", "json-path", "jslt".
 
