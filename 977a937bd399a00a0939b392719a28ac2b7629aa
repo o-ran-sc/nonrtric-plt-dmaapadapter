@@ -47,6 +47,54 @@
       "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "3c62aeb8_42e7ae6c",
+        "filename": "docs/overview.rst",
+        "patchSetId": 3
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-06-21T12:10:59Z",
+      "side": 1,
+      "message": "\u003e buffered\n\nDone",
+      "parentUuid": "eee02e03_80e90590",
+      "range": {
+        "startLine": 46,
+        "startChar": 53,
+        "endLine": 46,
+        "endChar": 67
+      },
+      "revId": "977a937bd399a00a0939b392719a28ac2b7629aa",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "bcb3d7c8_34dac9aa",
+        "filename": "docs/overview.rst",
+        "patchSetId": 3
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-06-21T12:10:59Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "1f65a496_ed7a9b95",
+      "range": {
+        "startLine": 46,
+        "startChar": 79,
+        "endLine": 46,
+        "endChar": 88
+      },
+      "revId": "977a937bd399a00a0939b392719a28ac2b7629aa",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "e0abc69e_68b554a6",
@@ -83,6 +131,54 @@
       "writtenOn": "2022-06-21T11:48:06Z",
       "side": 1,
       "message": "fashion",
+      "range": {
+        "startLine": 48,
+        "startChar": 58,
+        "endLine": 48,
+        "endChar": 65
+      },
+      "revId": "977a937bd399a00a0939b392719a28ac2b7629aa",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4341f021_d849bc2a",
+        "filename": "docs/overview.rst",
+        "patchSetId": 3
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-06-21T12:10:59Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e0abc69e_68b554a6",
+      "range": {
+        "startLine": 48,
+        "startChar": 35,
+        "endLine": 48,
+        "endChar": 78
+      },
+      "revId": "977a937bd399a00a0939b392719a28ac2b7629aa",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7552ae0c_dd3280f9",
+        "filename": "docs/overview.rst",
+        "patchSetId": 3
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-06-21T12:10:59Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "c934c9d6_3222d769",
       "range": {
         "startLine": 48,
         "startChar": 58,
@@ -139,6 +235,54 @@
       "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "bd296d31_377bb27b",
+        "filename": "docs/overview.rst",
+        "patchSetId": 3
+      },
+      "lineNbr": 117,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-06-21T12:10:59Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "1e402bb5_baa0c136",
+      "range": {
+        "startLine": 117,
+        "startChar": 116,
+        "endLine": 117,
+        "endChar": 161
+      },
+      "revId": "977a937bd399a00a0939b392719a28ac2b7629aa",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "922aaded_5738e87b",
+        "filename": "docs/overview.rst",
+        "patchSetId": 3
+      },
+      "lineNbr": 117,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-06-21T12:10:59Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "f13a204d_18febe0b",
+      "range": {
+        "startLine": 117,
+        "startChar": 53,
+        "endLine": 117,
+        "endChar": 93
+      },
+      "revId": "977a937bd399a00a0939b392719a28ac2b7629aa",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "e7e581ae_114afc43",
@@ -152,6 +296,30 @@
       "writtenOn": "2022-06-21T11:48:06Z",
       "side": 1,
       "message": "\"Cannot deliver to both Kafka and HTTP in the same job\" would read better",
+      "range": {
+        "startLine": 79,
+        "startChar": 40,
+        "endLine": 79,
+        "endChar": 95
+      },
+      "revId": "977a937bd399a00a0939b392719a28ac2b7629aa",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ad376c3e_0f7a86b2",
+        "filename": "src/main/java/org/oran/dmaapadapter/repository/Jobs.java",
+        "patchSetId": 3
+      },
+      "lineNbr": 79,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-06-21T12:10:59Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e7e581ae_114afc43",
       "range": {
         "startLine": 79,
         "startChar": 40,
