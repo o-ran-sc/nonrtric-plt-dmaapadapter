@@ -26,6 +26,8 @@ The service is implemented in Java Spring Boot (DMaaP Adapter Service).
 .. image:: ./Architecture.png
    :width: 500pt
 
+This product is a part of :doc:`NONRTRIC <nonrtric:index>`.
+
 *************
 Data Delivery
 *************

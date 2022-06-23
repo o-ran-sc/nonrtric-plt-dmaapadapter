@@ -13,5 +13,3 @@ Non-RT RIC DMaaP Adapter
    ./developer-guide.rst
    ./api-docs.rst
    ./release-notes.rst
-
-* :ref:`search`
