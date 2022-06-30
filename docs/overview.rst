@@ -31,7 +31,7 @@ This product is a part of :doc:`NONRTRIC <nonrtric:index>`.
 *************
 Data Delivery
 *************
-When a data consumer creates a an Information Job, either a URL for REST callbacks, or a Kafka Topic can be given as output for the job.
+When a data consumer creates an Information Job, either a URL for REST callbacks, or a Kafka Topic can be given as output for the job.
 After filtering, aggregation and data transformation the data will be delivered to the output. Several data consumers can receive data from one Kafka Topic.
 
 .. image:: ./DataDelivery.png
@@ -39,7 +39,7 @@ After filtering, aggregation and data transformation the data will be delivered 
 
 The output will be the same regardless if the information is received from DMaaP of from Kafka. If the data is not buffered/aggregated,
 and the output is a Kafka Stream, both the keys and the values are forwarded (after filtering/transformation).
-If the output is HTTP,only the the values are forwarded (in the HTTP body).
+If the output is HTTP, only the the values are forwarded (in the HTTP body).
 
 ****************
 Data Aggregation
@@ -130,10 +130,10 @@ This schema will by default be registerred for the type. The following propertie
   * maxSize, the maximum number of objects to collect before delivery to the consumer
   * maxTimeMiliseconds, the maximum time to delay delivery (to buffer).
 
-* maxConcurrency, defines max how many paralell REST calls the consumer wishes to receive. 1, which is default, means sequential. A higher values may increase throughput.
+* maxConcurrency, defines max how many paralell REST calls the consumer wishes to receive. 1, which is default, means sequential. A higher value may increase throughput.
 
 
-Below follows examples of a filters.
+Below follows examples of some filters.
 
 .. code-block:: javascript
 
@@ -182,7 +182,7 @@ define which meas-types (counters) to get from which resources.
 The filterType parameter is extended to allow value "pmdata" which can be used for PM data filtering.
 
 * sourceNames an array of source names for wanted PM reports.
-* measObjInstIds an array of meas object instances for wanted PM reports. If a the given filter value is contained in the filter definition, it will match (partial matching).
+* measObjInstIds an array of meas object instances for wanted PM reports. If a given filter value is contained in the filter definition, it will match (partial matching).
   For instance a value like "NRCellCU" will match "ManagedElement=seliitdus00487,GNBCUCPFunction=1,NRCellCU=32".
 * measTypes selects the meas types to get
 * measuredEntityDns partial match of meas entity DNs.
@@ -190,7 +190,7 @@ The filterType parameter is extended to allow value "pmdata" which can be used f
 All PM filter properties are optional and a non given will result in "match all".
 The result of the filtering is still following the structure of a 3GPP PM report.
 
-Below follows an example on a PM filter.
+Below follows an example of a PM filter.
 
 .. code-block:: javascript
 
