@@ -20,25 +20,29 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
-import reactor.core.publisher.Sinks.Many;
+
+import org.oran.dmaapadapter.filter.PmReport;
+import reactor.core.publisher.Flux;
 
 public interface TopicListener {
 
     @ToString
-    public static class Output {
+    public static class DataFromTopic {
         public final String key;
         public final String value;
 
-        public Output(String key, String value) {
+        @Getter
+        @Setter
+        private PmReport cachedPmReport;
+
+        public DataFromTopic(String key, String value) {
             this.key = key;
             this.value = value;
         }
     }
 
-    public void start();
-
-    public void stop();
-
-    public Many<Output> getOutput();
+    public Flux<DataFromTopic> getFlux();
 }

@@ -186,6 +186,8 @@ The filterType parameter is extended to allow value "pmdata" which can be used f
   For instance a value like "NRCellCU" will match "ManagedElement=seliitdus00487,GNBCUCPFunction=1,NRCellCU=32".
 * measTypes selects the meas types to get
 * measuredEntityDns partial match of meas entity DNs.
+* measObjClass matching of the class of the measObjInstId. The measObjInstId must follow the 3GPP naming conventions for Managed Objects (3GPP TS 32.106-8).
+  Example, for a distinguished name "ManagedElement=RNC-Gbg-1,ENodeBFunction=1", the MO class will be "ENodeBFunction".
 
 All PM filter properties are optional and a non given will result in "match all".
 The result of the filtering is still following the structure of a 3GPP PM report.
@@ -195,7 +197,7 @@ Below follows an example of a PM filter.
 .. code-block:: javascript
 
     {
-      "filterType":"pmdata"
+      "filterType":"pmdata",
       "filter": {
         "sourceNames":[
            "O-DU-1122"
@@ -205,7 +207,7 @@ Below follows an example of a PM filter.
         ],
         "measTypes":[
            "succImmediateAssignProcs"
-        ],eparate call.
+        ],
         "measuredEntityDns":[
            "ManagedElement=RNC-Gbg-1"
         ]

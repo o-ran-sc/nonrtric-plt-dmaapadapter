@@ -30,11 +30,8 @@ import org.oran.dmaapadapter.repository.InfoType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
-import reactor.core.publisher.Sinks.Many;
 
 /**
  * The class fetches incoming requests from DMAAP and sends them further to the
@@ -47,9 +44,8 @@ public class DmaapTopicListener implements TopicListener {
     private final AsyncRestClient dmaapRestClient;
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
-    private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
-    private Many<Output> output;
-    private Disposable topicReceiverTask;
+    private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
+    private Flux<DataFromTopic> dataFromDmaap;
 
     public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type, SecurityContext securityContext) {
         AsyncRestClientFactory restclientFactory =
@@ -60,42 +56,22 @@ public class DmaapTopicListener implements TopicListener {
     }
 
     @Override
-    public Many<Output> getOutput() {
-        return this.output;
-    }
-
-    @Override
-    public void start() {
-        stop();
-
-        final int CONSUMER_BACKPRESSURE_BUFFER_SIZE = 1024 * 10;
-        this.output = Sinks.many().multicast().onBackpressureBuffer(CONSUMER_BACKPRESSURE_BUFFER_SIZE);
-
-        topicReceiverTask = Flux.range(0, Integer.MAX_VALUE) //
-                .flatMap(notUsed -> getFromMessageRouter(getDmaapUrl()), 1) //
-                .doOnNext(this::onReceivedData) //
-                .subscribe(//
-                        null, //
-                        throwable -> logger.error("DmaapMessageConsumer error: {}", throwable.getMessage()), //
-                        this::onComplete); //
-    }
-
-    @Override
-    public void stop() {
-        if (topicReceiverTask != null) {
-            topicReceiverTask.dispose();
-            topicReceiverTask = null;
+    public Flux<DataFromTopic> getFlux() {
+        if (this.dataFromDmaap == null) {
+            this.dataFromDmaap = startFetchFromDmaap();
         }
+        return this.dataFromDmaap;
     }
 
-    private void onComplete() {
-        logger.warn("DmaapMessageConsumer completed {}", type.getId());
-        start();
-    }
-
-    private void onReceivedData(String input) {
-        logger.debug("Received from DMAAP topic: {} :{}", this.type.getDmaapTopicUrl(), input);
-        output.emitNext(new Output("", input), Sinks.EmitFailureHandler.FAIL_FAST);
+    private Flux<DataFromTopic> startFetchFromDmaap() {
+        return Flux.range(0, Integer.MAX_VALUE) //
+                .flatMap(notUsed -> getFromMessageRouter(getDmaapUrl()), 1) //
+                .doOnNext(input -> logger.debug("Received from DMaap: {} :{}", this.type.getDmaapTopicUrl(), input)) //
+                .doOnError(t -> logger.error("DmaapTopicListener error: {}", t.getMessage())) //
+                .doFinally(sig -> logger.error("DmaapTopicListener stopped, reason: {}", sig)) //
+                .publish() //
+                .autoConnect() //
+                .map(input -> new DataFromTopic("", input)); //
     }
 
     private String getDmaapUrl() {
@@ -113,7 +89,7 @@ public class DmaapTopicListener implements TopicListener {
         return dmaapRestClient.get(topicUrl) //
                 .filter(body -> body.length() > 3) // DMAAP will return "[]" sometimes. That is thrown away.
                 .flatMapMany(this::splitJsonArray) //
-                .doOnNext(message -> logger.debug("Message from DMAAP topic: {} : {}", topicUrl, message)) //
+                .doOnNext(message -> logger.debug("Message from DMaaP topic: {} : {}", topicUrl, message)) //
                 .onErrorResume(this::handleDmaapErrorResponse); //
     }
 

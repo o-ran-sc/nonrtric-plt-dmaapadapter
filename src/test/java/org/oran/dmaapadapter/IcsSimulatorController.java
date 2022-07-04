@@ -56,7 +56,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class IcsSimulatorController {
 
     private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-    private final static Gson gson = new GsonBuilder().create();
+    private final static Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 
     public static class TestResults {
 

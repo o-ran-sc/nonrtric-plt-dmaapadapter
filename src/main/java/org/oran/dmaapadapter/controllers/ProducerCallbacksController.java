@@ -33,6 +33,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.r1.ProducerJobInfo;
@@ -61,7 +62,10 @@ public class ProducerCallbacksController {
     public static final String API_DESCRIPTION = "";
     public static final String JOB_URL = "/generic_dataproducer/info_job";
     public static final String SUPERVISION_URL = "/generic_dataproducer/health_check";
-    private static Gson gson = new GsonBuilder().create();
+
+    public static final String STATISTICS_URL = "/statistics";
+
+    private static Gson gson = new GsonBuilder().disableHtmlEscaping().create();
     private final Jobs jobs;
     private final InfoTypes types;
 
@@ -143,6 +147,33 @@ public class ProducerCallbacksController {
     public ResponseEntity<Object> producerSupervision() {
         logger.debug("Producer supervision");
         return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @Schema(name = "statistics_info", description = "Statistics information")
+    public class Statistics {
+
+        @Schema(description = "Statistics per job")
+        public final Collection<Job.Statistics> jobStatistics;
+
+        public Statistics(Collection<Job.Statistics> stats) {
+            this.jobStatistics = stats;
+        }
+
+    }
+
+    @GetMapping(path = STATISTICS_URL, produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Returns statistics", description = "")
+    @ApiResponses(value = { //
+            @ApiResponse(responseCode = "200", description = "OK", //
+                    content = @Content(schema = @Schema(implementation = Statistics.class))) //
+    })
+    public ResponseEntity<Object> getStatistics() {
+        List<Job.Statistics> res = new ArrayList<>();
+        for (Job job : this.jobs.getAll()) {
+            res.add(job.getStatistics());
+        }
+
+        return new ResponseEntity<>(gson.toJson(new Statistics(res)), HttpStatus.OK);
     }
 
 }

@@ -18,32 +18,49 @@
  * ========================LICENSE_END===================================
  */
 
-package org.oran.dmaapadapter.repository.filters;
+package org.oran.dmaapadapter.filter;
 
-
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import lombok.Getter;
 
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.thymeleaf.util.StringUtils;
 
 public class PmReportFilter implements Filter {
+    private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-    private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+    private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder() //
+            .disableHtmlEscaping() //
+            .excludeFieldsWithoutExposeAnnotation() //
+            .create();
+
+    // excludeFieldsWithoutExposeAnnotation is not needed when parsing and this is a
+    // bit quicker
+    private static com.google.gson.Gson gsonParse = new com.google.gson.GsonBuilder() //
+            .disableHtmlEscaping() //
+            .create();
+
     private final FilterData filterData;
 
     @Getter
     public static class FilterData {
-        Collection<String> sourceNames = new ArrayList<>();
-        Collection<String> measObjInstIds = new ArrayList<>();
-        Collection<String> measTypes = new ArrayList<>();
-        Collection<String> measuredEntityDns = new ArrayList<>();
+        final Collection<String> sourceNames = new HashSet<>();
+        final Collection<String> measObjInstIds = new ArrayList<>();
+        final Collection<String> measTypes = new HashSet<>();
+        final Collection<String> measuredEntityDns = new ArrayList<>();
+        final Collection<String> measObjClass = new HashSet<>();
     }
 
     private static class MeasTypesIndexed extends PmReport.MeasTypes {
+
         private Map<String, Integer> map = new HashMap<>();
 
         public int addP(String measTypeName) {
@@ -51,9 +68,9 @@ public class PmReportFilter implements Filter {
             if (p != null) {
                 return p;
             } else {
-                this.sMeasTypesList.add(measTypeName);
-                this.map.put(measTypeName, this.sMeasTypesList.size());
-                return this.sMeasTypesList.size();
+                sMeasTypesList.add(measTypeName);
+                this.map.put(measTypeName, sMeasTypesList.size());
+                return sMeasTypesList.size();
             }
         }
     }
@@ -63,13 +80,32 @@ public class PmReportFilter implements Filter {
     }
 
     @Override
-    public String filter(String data) {
-        PmReport report = gson.fromJson(data, PmReport.class);
-        if (!filter(report, this.filterData)) {
-            return "";
-        }
-        return gson.toJson(report);
+    public FilteredData filter(DataFromTopic data) {
+        try {
+            PmReport report = createPmReport(data);
+            if (report.event.perf3gppFields == null) {
+                logger.warn("Received PM report with no perf3gppFields, ignored. {}", data);
+                return FilteredData.empty();
+            }
 
+            if (!filter(report, this.filterData)) {
+                return FilteredData.empty();
+            }
+            return new FilteredData(data.key, gson.toJson(report));
+        } catch (Exception e) {
+            logger.warn("Could not parse PM data. {}, reason: {}", data, e.getMessage());
+            return FilteredData.empty();
+        }
+    }
+
+    @SuppressWarnings("java:S2445") // "data" is a method parameter, and should not be used for synchronization.
+    private PmReport createPmReport(DataFromTopic data) {
+        synchronized (data) {
+            if (data.getCachedPmReport() == null) {
+                data.setCachedPmReport(gsonParse.fromJson(data.value, PmReport.class));
+            }
+            return data.getCachedPmReport();
+        }
     }
 
     /**
@@ -114,12 +150,38 @@ public class PmReportFilter implements Filter {
         return newMeasResults;
     }
 
+    private boolean isMeasInstIdMatch(String measObjInstId, FilterData filter) {
+        return filter.measObjInstIds.isEmpty() || isContainedInAny(measObjInstId, filter.measObjInstIds);
+    }
+
+    private String managedObjectClass(String distinguishedName) {
+        int lastRdn = distinguishedName.lastIndexOf(",");
+        if (lastRdn == -1) {
+            return "";
+        }
+        int lastEqualChar = distinguishedName.indexOf("=", lastRdn);
+        if (lastEqualChar == -1) {
+            return "";
+        }
+        return distinguishedName.substring(lastRdn + 1, lastEqualChar);
+    }
+
+    private boolean isMeasInstClassMatch(String measObjInstId, FilterData filter) {
+        if (filter.measObjClass.isEmpty()) {
+            return true;
+        }
+
+        String measObjClass = managedObjectClass(measObjInstId);
+        return filter.measObjClass.contains(measObjClass);
+    }
+
     private PmReport.MeasValuesList createMeasValuesList(PmReport.MeasValuesList oldMeasValues,
             PmReport.MeasTypes measTypes, FilterData filter) {
 
         PmReport.MeasValuesList newMeasValuesList = oldMeasValues.shallowClone();
 
-        if (isContainedInAny(oldMeasValues.measObjInstId, filter.measObjInstIds) || filter.measObjInstIds.isEmpty()) {
+        if (isMeasInstIdMatch(oldMeasValues.measObjInstId, filter)
+                && isMeasInstClassMatch(oldMeasValues.measObjInstId, filter)) {
             newMeasValuesList.measResults = createMeasResults(oldMeasValues.measResults, measTypes, filter);
         }
         return newMeasValuesList;

@@ -20,6 +20,7 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,15 +32,15 @@ import reactor.core.publisher.Mono;
  * owner via REST calls.
  */
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
-public class HttpDataConsumer extends DataConsumer {
-    private static final Logger logger = LoggerFactory.getLogger(HttpDataConsumer.class);
+public class HttpJobDataDistributor extends JobDataDistributor {
+    private static final Logger logger = LoggerFactory.getLogger(HttpJobDataDistributor.class);
 
-    public HttpDataConsumer(Job job) {
+    public HttpJobDataDistributor(Job job) {
         super(job);
     }
 
     @Override
-    protected Mono<String> sendToClient(TopicListener.Output output) {
+    protected Mono<String> sendToClient(Filter.FilteredData output) {
         Job job = this.getJob();
         logger.debug("Sending to consumer {} {} {}", job.getId(), job.getCallbackUrl(), output);
         MediaType contentType = job.isBuffered() || job.getType().isJson() ? MediaType.APPLICATION_JSON : null;

@@ -18,15 +18,16 @@
  * ========================LICENSE_END===================================
  */
 
-package org.oran.dmaapadapter.repository.filters;
+package org.oran.dmaapadapter.filter;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class RegexpFilter implements Filter {
+class RegexpFilter implements Filter {
     private static final Logger logger = LoggerFactory.getLogger(RegexpFilter.class);
     private Pattern regexp;
 
@@ -39,16 +40,16 @@ public class RegexpFilter implements Filter {
     }
 
     @Override
-    public String filter(String data) {
+    public FilteredData filter(DataFromTopic data) {
         if (regexp == null) {
-            return data;
+            return new FilteredData(data.key, data.value);
         }
-        Matcher matcher = regexp.matcher(data);
+        Matcher matcher = regexp.matcher(data.value);
         boolean match = matcher.find();
         if (match) {
-            return data;
+            return new FilteredData(data.key, data.value);
         } else {
-            return "";
+            return FilteredData.empty();
         }
     }
 

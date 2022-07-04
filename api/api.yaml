@@ -72,6 +72,19 @@ paths:
             application/json:
               schema:
                 type: object
+  /statistics:
+    get:
+      tags:
+      - Producer job control API
+      summary: Returns statistics
+      operationId: getStatistics
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/statistics_info'
   /generic_dataproducer/health_check:
     get:
       tags:
@@ -455,6 +468,50 @@ components:
     void:
       type: object
       description: Void/empty
+    job_statistics:
+      required:
+      - jobId
+      - noOfReceivedBytes
+      - noOfReceivedObjects
+      - noOfSentBytes
+      - noOfSentObjects
+      - typeId
+      type: object
+      properties:
+        noOfSentObjects:
+          type: integer
+          format: int32
+        jobId:
+          type: string
+        outputTopic:
+          type: string
+        noOfSentBytes:
+          type: integer
+          format: int32
+        clientId:
+          type: string
+        groupId:
+          type: string
+        noOfReceivedBytes:
+          type: integer
+          format: int32
+        typeId:
+          type: string
+        inputTopic:
+          type: string
+        noOfReceivedObjects:
+          type: integer
+          format: int32
+      description: Statistics information for one job
+    statistics_info:
+      type: object
+      properties:
+        jobStatistics:
+          type: array
+          description: Statistics per job
+          items:
+            $ref: '#/components/schemas/job_statistics'
+      description: Statistics information
     producer_registration_info:
       required:
       - info_job_callback_url

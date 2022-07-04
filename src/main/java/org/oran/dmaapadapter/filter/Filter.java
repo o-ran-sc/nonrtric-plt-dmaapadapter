@@ -18,29 +18,37 @@
  * ========================LICENSE_END===================================
  */
 
-package org.oran.dmaapadapter.repository.filters;
+package org.oran.dmaapadapter.filter;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import lombok.ToString;
 
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 
-import org.junit.jupiter.api.Test;
+public interface Filter {
 
-class JsonPathFilterTest {
-
-    @Test
-    void testJsonPath() throws Exception {
-        String exp = ("$.event.perf3gppFields.measDataCollection.measInfoList[0].measTypes.sMeasTypesList[0]");
-        JsonPathFilter filter = new JsonPathFilter(exp);
-        String res = filter.filter(loadReport());
-        assertThat(res).isEqualTo("\"attTCHSeizures\"");
+    public enum Type {
+        REGEXP, JSLT, JSON_PATH, PM_DATA, NONE
     }
 
-    private String loadReport() throws Exception {
-        String path = "./src/test/resources/pm_report.json";
-        return Files.readString(Path.of(path), Charset.defaultCharset());
+    @ToString
+    public static class FilteredData {
+        public final String key;
+        public final String value;
+        private static final FilteredData emptyData = new FilteredData("", "");
+
+        public boolean isEmpty() {
+            return value.isEmpty() && key.isEmpty();
+        }
+
+        public FilteredData(String key, String value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public static FilteredData empty() {
+            return emptyData;
+        }
     }
 
+    public FilteredData filter(DataFromTopic data);
 }

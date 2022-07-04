@@ -20,40 +20,35 @@
 
 package org.oran.dmaapadapter.repository;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 
+import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.springframework.util.StringUtils;
 
 @ToString
+@Builder
 public class InfoType {
 
     @Getter
-    private final String id;
+    private String id;
 
     @Getter
-    private final String dmaapTopicUrl;
+    private String dmaapTopicUrl;
 
     @Getter
-    private final boolean useHttpProxy;
+    @Builder.Default
+    private boolean useHttpProxy = false;
 
     @Getter
-    private final String kafkaInputTopic;
+    private String kafkaInputTopic;
 
-    private final String dataType;
+    private String dataType;
 
     @Getter
+    @Builder.Default
     private boolean isJson = false;
-
-    public InfoType(String id, String dmaapTopicUrl, boolean useHttpProxy, String kafkaInputTopic, String dataType,
-            boolean isJson) {
-        this.id = id;
-        this.dmaapTopicUrl = dmaapTopicUrl;
-        this.useHttpProxy = useHttpProxy;
-        this.kafkaInputTopic = kafkaInputTopic;
-        this.dataType = dataType;
-        this.isJson = isJson;
-    }
 
     public boolean isKafkaTopicDefined() {
         return StringUtils.hasLength(kafkaInputTopic);
@@ -76,6 +71,14 @@ public class InfoType {
             return DataType.PM_DATA;
         }
         return DataType.OTHER;
+    }
+
+    public String getKafkaGroupId() {
+        return this.kafkaInputTopic == null ? null : "osc-dmaap-adapter-" + getId();
+    }
+
+    public String getKafkaClientId(ApplicationConfig appConfig) {
+        return this.kafkaInputTopic == null ? null : getId() + "_" + appConfig.getSelfUrl();
 
     }
 }
