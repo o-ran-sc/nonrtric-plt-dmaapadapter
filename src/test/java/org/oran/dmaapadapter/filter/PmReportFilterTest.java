@@ -18,7 +18,7 @@
  * ========================LICENSE_END===================================
  */
 
-package org.oran.dmaapadapter.repository.filters;
+package org.oran.dmaapadapter.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,19 +27,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
+import org.oran.dmaapadapter.tasks.TopicListener;
 
 class PmReportFilterTest {
 
+    private String filterReport(PmReportFilter filter) throws Exception {
+        return filter.filter(new TopicListener.DataFromTopic("", loadReport())).value;
+    }
+
     @Test
     void testPmFilterMeasTypes() throws Exception {
-
-        String reportJson = loadReport();
 
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.measTypes.add("succImmediateAssignProcs");
 
         PmReportFilter filter = new PmReportFilter(filterData);
-        String filtered = filter.filter(reportJson);
+        String filtered = filterReport(filter);
 
         assertThat(filtered).contains("succImmediateAssignProcs").doesNotContain("\"p\":2").contains("\"p\":1")
                 .contains("Gbg-997");
@@ -48,7 +51,7 @@ class PmReportFilterTest {
         filterData = new PmReportFilter.FilterData();
         filterData.measTypes.add("junk");
         filter = new PmReportFilter(filterData);
-        filtered = filter.filter(reportJson);
+        filtered = filterReport(filter);
         assertThat(filtered).isEmpty();
     }
 
@@ -57,14 +60,29 @@ class PmReportFilterTest {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.measObjInstIds.add("junk");
         PmReportFilter filter = new PmReportFilter(filterData);
-        String filtered = filter.filter(loadReport());
+        String filtered = filterReport(filter);
         assertThat(filtered).isEmpty();
 
         filterData = new PmReportFilter.FilterData();
         filterData.measObjInstIds.add("UtranCell=Gbg-997");
         filter = new PmReportFilter(filterData);
-        filtered = filter.filter(loadReport());
+        filtered = filterReport(filter);
         assertThat(filtered).contains("Gbg-997").doesNotContain("Gbg-998");
+    }
+
+    @Test
+    void testMeasObjClass() throws Exception {
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        filterData.measObjClass.add("junk");
+        PmReportFilter filter = new PmReportFilter(filterData);
+        String filtered = filterReport(filter);
+        assertThat(filtered).isEmpty();
+
+        filterData = new PmReportFilter.FilterData();
+        filterData.measObjClass.add("ENodeBFunction");
+        filter = new PmReportFilter(filterData);
+        filtered = filterReport(filter);
+        assertThat(filtered).contains("ENodeBFunction").doesNotContain("UtranCell");
     }
 
     @Test
@@ -72,13 +90,13 @@ class PmReportFilterTest {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.sourceNames.add("junk");
         PmReportFilter filter = new PmReportFilter(filterData);
-        String filtered = filter.filter(loadReport());
+        String filtered = filterReport(filter);
         assertThat(filtered).isEmpty();
 
         filterData = new PmReportFilter.FilterData();
         filterData.sourceNames.add("O-DU-1122");
         filter = new PmReportFilter(filterData);
-        filtered = filter.filter(loadReport());
+        filtered = filterReport(filter);
         assertThat(filtered).contains("O-DU-1122");
     }
 
@@ -87,19 +105,36 @@ class PmReportFilterTest {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.measuredEntityDns.add("junk");
         PmReportFilter filter = new PmReportFilter(filterData);
-        String filtered = filter.filter(loadReport());
+        String filtered = filterReport(filter);
         assertThat(filtered).isEmpty();
 
         filterData = new PmReportFilter.FilterData();
         filterData.measuredEntityDns.add("ManagedElement=RNC-Gbg-1");
         filter = new PmReportFilter(filterData);
-        filtered = filter.filter(loadReport());
-        assertThat(filtered).contains("RNC-Gbg-1"); // '=' is escaped to unicode by gson. OK
+        filtered = filterReport(filter);
+        assertThat(filtered).contains("ManagedElement=RNC-Gbg-1");
+    }
+
+    @Test
+    void testCrapInput() {
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        PmReportFilter filter = new PmReportFilter(filterData);
+
+        String filtered = filter.filter(new TopicListener.DataFromTopic("", "junk")).value;
+        assertThat(filtered).isEmpty();
+
+        filtered = filter.filter(new TopicListener.DataFromTopic("", reQuote("{'msg': 'test'}"))).value;
+        assertThat(filtered).isEmpty();
+
+    }
+
+    private String reQuote(String str) {
+        return str.replaceAll("'", "\\\"");
     }
 
     @Test
     void testParse() throws Exception {
-        com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+        com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
         PmReport report = gson.fromJson(loadReport(), PmReport.class);
 
         String dn = report.event.perf3gppFields.measDataCollection.measuredEntityDn;

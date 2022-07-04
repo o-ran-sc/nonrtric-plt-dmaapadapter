@@ -1,3 +1,20 @@
+#  ============LICENSE_START===============================================
+#  Copyright (C) 2021-2022 Nordix Foundation. All rights reserved.
+#  ========================================================================
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#  ============LICENSE_END=================================================
+#
+
 spring:
   profiles:
     active: prod
@@ -16,11 +33,13 @@ springdoc:
 logging:
   # Configuration of logging
   level:
-    ROOT: ERROR
+    ROOT: WARN
+    org.apache.kafka: WARN
     org.springframework: ERROR
     org.springframework.data: ERROR
     org.springframework.web.reactive.function.client.ExchangeFunctions: ERROR
     org.oran.dmaapadapter: INFO
+
   file:
     name: /var/log/dmaap-adapter-service/application.log
 server:
@@ -59,3 +78,4 @@ app:
     bootstrap-servers: localhost:9092
   # If the file name is empty, no authorization token is used
   auth-token-file:
+  pm-files-path: /tmp

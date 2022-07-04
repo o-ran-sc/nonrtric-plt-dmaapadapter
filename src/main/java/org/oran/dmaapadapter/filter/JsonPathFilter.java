@@ -18,18 +18,19 @@
  * ========================LICENSE_END===================================
  */
 
-package org.oran.dmaapadapter.repository.filters;
+package org.oran.dmaapadapter.filter;
 
 import com.jayway.jsonpath.JsonPath;
 
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JsonPathFilter implements Filter {
+class JsonPathFilter implements Filter {
 
     private String expression;
     private static final Logger logger = LoggerFactory.getLogger(JsonPathFilter.class);
-    com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+    com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
 
     public JsonPathFilter(String exp) {
         try {
@@ -40,12 +41,12 @@ public class JsonPathFilter implements Filter {
     }
 
     @Override
-    public String filter(String jsonString) {
+    public FilteredData filter(DataFromTopic data) {
         try {
-            Object o = JsonPath.parse(jsonString).read(this.expression, Object.class);
-            return o == null ? "" : gson.toJson(o);
+            Object o = JsonPath.parse(data.value).read(this.expression, Object.class);
+            return o == null ? FilteredData.empty() : new FilteredData(data.key, gson.toJson(o));
         } catch (Exception e) {
-            return "";
+            return FilteredData.empty();
         }
 
     }

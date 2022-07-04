@@ -22,6 +22,7 @@ package org.oran.dmaapadapter.tasks;
 
 import lombok.Getter;
 
+import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,8 +37,8 @@ import reactor.core.publisher.Mono;
  * owner via REST calls.
  */
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
-public abstract class DataConsumer {
-    private static final Logger logger = LoggerFactory.getLogger(DataConsumer.class);
+public abstract class JobDataDistributor {
+    private static final Logger logger = LoggerFactory.getLogger(JobDataDistributor.class);
     @Getter
     private final Job job;
     private Disposable subscription;
@@ -69,17 +70,17 @@ public abstract class DataConsumer {
         }
     }
 
-    protected DataConsumer(Job job) {
+    protected JobDataDistributor(Job job) {
         this.job = job;
     }
 
-    public synchronized void start(Flux<TopicListener.Output> input) {
+    public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
         stop();
         this.errorStats.resetIrrecoverableErrors();
-        this.subscription = handleReceivedMessage(input, job) //
+        this.subscription = filterAndBuffer(input, this.job) //
                 .flatMap(this::sendToClient, job.getParameters().getMaxConcurrency()) //
                 .onErrorResume(this::handleError) //
-                .subscribe(this::handleConsumerSentOk, //
+                .subscribe(this::handleSentOk, //
                         this::handleExceptionInStream, //
                         () -> logger.warn("HttpDataConsumer stopped jobId: {}", job.getId()));
     }
@@ -89,7 +90,7 @@ public abstract class DataConsumer {
         stop();
     }
 
-    protected abstract Mono<String> sendToClient(TopicListener.Output output);
+    protected abstract Mono<String> sendToClient(Filter.FilteredData output);
 
     public synchronized void stop() {
         if (this.subscription != null) {
@@ -102,19 +103,21 @@ public abstract class DataConsumer {
         return this.subscription != null;
     }
 
-    private Flux<TopicListener.Output> handleReceivedMessage(Flux<TopicListener.Output> inputFlux, Job job) {
-        Flux<TopicListener.Output> result =
-                inputFlux.map(input -> new TopicListener.Output(input.key, job.filter(input.value))) //
-                        .filter(t -> !t.value.isEmpty()); //
+    private Flux<Filter.FilteredData> filterAndBuffer(Flux<TopicListener.DataFromTopic> inputFlux, Job job) {
+        Flux<Filter.FilteredData> filtered = //
+                inputFlux.doOnNext(data -> job.getStatistics().received(data.value)) //
+                        .map(job::filter) //
+                        .filter(f -> !f.isEmpty()) //
+                        .doOnNext(f -> job.getStatistics().filtered(f.value)); //
 
         if (job.isBuffered()) {
-            result = result.map(input -> quoteNonJson(input.value, job)) //
+            filtered = filtered.map(input -> quoteNonJson(input.value, job)) //
                     .bufferTimeout( //
                             job.getParameters().getBufferTimeout().getMaxSize(), //
                             job.getParameters().getBufferTimeout().getMaxTime()) //
-                    .map(buffered -> new TopicListener.Output("", buffered.toString()));
+                    .map(buffered -> new Filter.FilteredData("", buffered.toString()));
         }
-        return result;
+        return filtered;
     }
 
     private String quoteNonJson(String str, Job job) {
@@ -136,7 +139,7 @@ public abstract class DataConsumer {
         }
     }
 
-    private void handleConsumerSentOk(String data) {
+    private void handleSentOk(String data) {
         this.errorStats.handleOkFromConsumer();
     }
 

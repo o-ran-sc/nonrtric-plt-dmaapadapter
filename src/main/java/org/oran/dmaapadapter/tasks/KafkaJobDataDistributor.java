@@ -27,6 +27,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
+import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,19 +43,19 @@ import reactor.kafka.sender.SenderRecord;
  * owner via REST calls.
  */
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
-public class KafkaDataConsumer extends DataConsumer {
-    private static final Logger logger = LoggerFactory.getLogger(KafkaDataConsumer.class);
+public class KafkaJobDataDistributor extends JobDataDistributor {
+    private static final Logger logger = LoggerFactory.getLogger(KafkaJobDataDistributor.class);
 
     private KafkaSender<String, String> sender;
     private final ApplicationConfig appConfig;
 
-    public KafkaDataConsumer(Job job, ApplicationConfig appConfig) {
+    public KafkaJobDataDistributor(Job job, ApplicationConfig appConfig) {
         super(job);
         this.appConfig = appConfig;
     }
 
     @Override
-    protected Mono<String> sendToClient(TopicListener.Output data) {
+    protected Mono<String> sendToClient(Filter.FilteredData data) {
         Job job = this.getJob();
 
         logger.debug("Sending data '{}' to Kafka topic: {}", data, this.getJob().getParameters().getKafkaOutputTopic());
@@ -67,7 +68,7 @@ public class KafkaDataConsumer extends DataConsumer {
     }
 
     @Override
-    public synchronized void start(Flux<TopicListener.Output> input) {
+    public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
         super.start(input);
         SenderOptions<String, String> senderOptions = senderOptions(appConfig);
         this.sender = KafkaSender.create(senderOptions);
@@ -87,14 +88,13 @@ public class KafkaDataConsumer extends DataConsumer {
 
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ProducerConfig.CLIENT_ID_CONFIG, "sample-producerx");
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         return SenderOptions.create(props);
     }
 
-    private SenderRecord<String, String, Integer> senderRecord(TopicListener.Output output, Job infoJob) {
+    private SenderRecord<String, String, Integer> senderRecord(Filter.FilteredData output, Job infoJob) {
         int correlationMetadata = 2;
         String topic = infoJob.getParameters().getKafkaOutputTopic();
         return SenderRecord.create(new ProducerRecord<>(topic, output.key, output.value), correlationMetadata);
