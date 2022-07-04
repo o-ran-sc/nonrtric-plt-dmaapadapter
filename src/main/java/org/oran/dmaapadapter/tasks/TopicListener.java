@@ -21,7 +21,7 @@
 package org.oran.dmaapadapter.tasks;
 
 import lombok.ToString;
-import reactor.core.publisher.Sinks.Many;
+import reactor.core.publisher.Flux;
 
 public interface TopicListener {
 
@@ -36,9 +36,5 @@ public interface TopicListener {
         }
     }
 
-    public void start();
-
-    public void stop();
-
-    public Many<Output> getOutput();
+    public Flux<Output> getOutput();
 }

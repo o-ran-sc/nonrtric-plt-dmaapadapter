@@ -29,12 +29,14 @@ import com.google.gson.JsonParser;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
@@ -48,7 +50,6 @@ import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
-import org.oran.dmaapadapter.tasks.DataConsumer;
 import org.oran.dmaapadapter.tasks.KafkaTopicListener;
 import org.oran.dmaapadapter.tasks.TopicListener;
 import org.oran.dmaapadapter.tasks.TopicListeners;
@@ -64,7 +65,6 @@ import org.springframework.boot.web.servlet.server.ServletWebServerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.TestPropertySource;
 
-import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderOptions;
@@ -151,11 +151,57 @@ class IntegrationWithKafka {
         }
     }
 
+    private static class KafkaReceiver {
+        public final static String OUTPUT_TOPIC = "outputTopic";
+        private TopicListener.Output receivedKafkaOutput = new TopicListener.Output("", "");
+        private final Logger logger = LoggerFactory.getLogger(IntegrationWithKafka.class);
+
+        public KafkaReceiver(ApplicationConfig applicationConfig) {
+
+            // Create a listener to the output topic. The KafkaTopicListener happens to be
+            // suitable for that,
+            InfoType type = new InfoType("id", null, false, OUTPUT_TOPIC, "dataType", false);
+            KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type);
+
+            topicListener.getOutput() //
+                    .doOnNext(this::set) //
+                    .doFinally(sig -> logger.info("Finally " + sig)) //
+                    .subscribe();
+        }
+
+        private void set(TopicListener.Output receivedKafkaOutput) {
+            this.receivedKafkaOutput = receivedKafkaOutput;
+            logger.debug("*** received {}, {}", OUTPUT_TOPIC, receivedKafkaOutput);
+        }
+
+        synchronized String lastKey() {
+            return this.receivedKafkaOutput.key;
+        }
+
+        synchronized String lastValue() {
+            return this.receivedKafkaOutput.value;
+        }
+    }
+
+    private static KafkaReceiver kafkaReceiver;
+
+    @BeforeEach
+    void init() {
+        if (kafkaReceiver == null) {
+            kafkaReceiver = new KafkaReceiver(this.applicationConfig);
+        }
+    }
+
     @AfterEach
     void reset() {
+        for (Job job : this.jobs.getAll()) {
+            this.icsSimulatorController.deleteJob(job.getId(), restClient());
+        }
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
+        await().untilAsserted(() -> assertThat(this.topicListeners.getDataConsumers().keySet()).isEmpty());
+
         this.consumerController.testResults.reset();
         this.icsSimulatorController.testResults.reset();
-        this.jobs.clear();
     }
 
     private AsyncRestClient restClient(boolean useTrustValidation) {
@@ -265,9 +311,19 @@ class IntegrationWithKafka {
         }
     }
 
+    private void verifiedReceivedByConsumerLast(String s) {
+        ConsumerController.TestResults consumer = this.consumerController.testResults;
+
+        await().untilAsserted(() -> assertThat(last(consumer.receivedBodies)).isEqualTo(s));
+    }
+
+    private String last(List<String> l) {
+        return l.isEmpty() ? "" : l.get(l.size() - 1);
+    }
+
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
-    private static void sleep(long millis) throws InterruptedException {
-        Thread.sleep(millis);
+    private static void waitForKafkaListener() throws InterruptedException {
+        Thread.sleep(4000);
     }
 
     @Test
@@ -280,59 +336,12 @@ class IntegrationWithKafka {
 
         this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0, 1), JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+        waitForKafkaListener();
 
-        sleep(4000);
         var dataToSend = Flux.just(senderRecord("Message", ""));
         sendDataToStream(dataToSend);
 
         verifiedReceivedByConsumer("Message");
-
-        this.icsSimulatorController.deleteJob(JOB_ID, restClient());
-
-        await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
-        await().untilAsserted(() -> assertThat(this.topicListeners.getDataConsumers().keySet()).isEmpty());
-    }
-
-    TopicListener.Output receivedKafkaOutput = new TopicListener.Output("", "");
-
-    @Test
-    void sendToKafkaConsumer() throws ServiceException, InterruptedException {
-        final String JOB_ID = "ID";
-
-        // Register producer, Register types
-        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
-        assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
-
-        final String OUTPUT_TOPIC = "outputTopic";
-
-        this.icsSimulatorController.addJob(consumerJobInfoKafka(OUTPUT_TOPIC), JOB_ID, restClient());
-        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
-
-        // Create a listener to the output topic. The KafkaTopicListener happens to be
-        // suitable for that,
-        InfoType type = new InfoType("id", null, false, OUTPUT_TOPIC, "dataType", false);
-        KafkaTopicListener receiver = new KafkaTopicListener(this.applicationConfig, type);
-        receiver.start();
-
-        Disposable disponsable = receiver.getOutput().asFlux() //
-                .doOnNext(output -> {
-                    receivedKafkaOutput = output;
-                    logger.info("*** recived {}, {}", OUTPUT_TOPIC, output);
-                }) //
-                .doFinally(sig -> logger.info("Finally " + sig)) //
-                .subscribe();
-
-        String sendString = "testData " + Instant.now();
-        String sendKey = "key " + Instant.now();
-        var dataToSend = Flux.just(senderRecord(sendString, sendKey));
-        sleep(4000);
-        sendDataToStream(dataToSend);
-
-        await().untilAsserted(() -> assertThat(this.receivedKafkaOutput.value).isEqualTo(sendString));
-        assertThat(this.receivedKafkaOutput.key).isEqualTo(sendKey);
-
-        disponsable.dispose();
-        receiver.stop();
     }
 
     @Test
@@ -348,25 +357,67 @@ class IntegrationWithKafka {
         this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ofMillis(400), 10, 20), JOB_ID1,
                 restClient());
         this.icsSimulatorController.addJob(consumerJobInfo("^Message_1$", Duration.ZERO, 0, 1), JOB_ID2, restClient());
-
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
+        waitForKafkaListener();
 
-        sleep(2000);
         var dataToSend = Flux.range(1, 3).map(i -> senderRecord("Message_" + i)); // Message_1, Message_2 etc.
         sendDataToStream(dataToSend);
 
         verifiedReceivedByConsumer("Message_1", "[\"Message_1\", \"Message_2\", \"Message_3\"]");
-
-        // Delete the jobs
-        this.icsSimulatorController.deleteJob(JOB_ID1, restClient());
-        this.icsSimulatorController.deleteJob(JOB_ID2, restClient());
-
-        await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
-        await().untilAsserted(() -> assertThat(this.topicListeners.getDataConsumers().keySet()).isEmpty());
     }
 
     @Test
-    void kafkaIOverflow() throws Exception {
+    void sendToKafkaConsumer() throws ServiceException, InterruptedException {
+        final String JOB_ID = "ID";
+
+        // Register producer, Register types
+        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
+        assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
+
+        this.icsSimulatorController.addJob(consumerJobInfoKafka(KafkaReceiver.OUTPUT_TOPIC), JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+        waitForKafkaListener();
+
+        String sendString = "testData " + Instant.now();
+        String sendKey = "key " + Instant.now();
+        var dataToSend = Flux.just(senderRecord(sendString, sendKey));
+        sendDataToStream(dataToSend);
+
+        await().untilAsserted(() -> assertThat(kafkaReceiver.lastValue()).isEqualTo(sendString));
+        assertThat(kafkaReceiver.lastKey()).isEqualTo(sendKey);
+    }
+
+    @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
+    @Test
+    void kafkaCharacteristics() throws Exception {
+        final String JOB_ID = "kafkaCharacteristics";
+
+        // Register producer, Register types
+        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
+        assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
+
+        this.icsSimulatorController.addJob(consumerJobInfoKafka(KafkaReceiver.OUTPUT_TOPIC), JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+        waitForKafkaListener();
+
+        final int NO_OF_OBJECTS = 100000;
+
+        Instant startTime = Instant.now();
+
+        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> senderRecord("Message_" + i)); // Message_1, etc.
+        sendDataToStream(dataToSend);
+
+        while (!kafkaReceiver.lastValue().equals("Message_" + NO_OF_OBJECTS)) {
+            logger.info("sleeping {}", kafkaReceiver.lastValue());
+            Thread.sleep(1000 * 1);
+        }
+
+        final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
+        logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
+    }
+
+    @Test
+    void kafkaDeleteJobShouldNotStopListener() throws Exception {
         final String JOB_ID1 = "ID1";
         final String JOB_ID2 = "ID2";
 
@@ -381,28 +432,20 @@ class IntegrationWithKafka {
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
 
-        var dataToSend = Flux.range(1, 1000000).map(i -> senderRecord("Message_" + i)); // Message_1, Message_2 etc.
-        sendDataToStream(dataToSend); // this should overflow
+        var dataToSend = Flux.range(1, 100).map(i -> senderRecord("Message_" + i)); // Message_1, Message_2 etc.
+        sendDataToStream(dataToSend); // this should not overflow
 
-        DataConsumer consumer = topicListeners.getDataConsumers().get(TYPE_ID).iterator().next();
-        await().untilAsserted(() -> assertThat(consumer.isRunning()).isFalse());
-        this.consumerController.testResults.reset();
-
-        this.icsSimulatorController.deleteJob(JOB_ID2, restClient()); // Delete one job
-        topicListeners.restartNonRunningKafkaTopics();
-        sleep(1000); // Restarting the input seems to take some asynch time
-
-        dataToSend = Flux.just(senderRecord("Howdy\""));
-        sendDataToStream(dataToSend);
-
-        verifiedReceivedByConsumer("[\"Howdy\\\"\"]");
-
-        // Delete the jobs
+        // Delete jobs, recreate one
         this.icsSimulatorController.deleteJob(JOB_ID1, restClient());
         this.icsSimulatorController.deleteJob(JOB_ID2, restClient());
-
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
-        await().untilAsserted(() -> assertThat(this.topicListeners.getDataConsumers().keySet()).isEmpty());
+        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0, 1), JOB_ID2, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+
+        dataToSend = Flux.just(senderRecord("Howdy"));
+        sendDataToStream(dataToSend);
+
+        verifiedReceivedByConsumerLast("Howdy");
     }
 
 }

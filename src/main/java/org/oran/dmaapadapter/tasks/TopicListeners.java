@@ -37,7 +37,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
@@ -53,8 +52,6 @@ public class TopicListeners {
     private final MultiMap<DataConsumer> dataConsumers = new MultiMap<>(); // Key is typeId, jobId
 
     private final ApplicationConfig appConfig;
-
-    private static final int CONSUMER_SUPERVISION_INTERVAL_MS = 1000 * 60 * 3;
 
     public TopicListeners(@Autowired ApplicationConfig appConfig, @Autowired InfoTypes types, @Autowired Jobs jobs,
             @Autowired SecurityContext securityContext) {
@@ -103,11 +100,8 @@ public class TopicListeners {
 
     private void addConsumer(Job job, MultiMap<DataConsumer> consumers, Map<String, TopicListener> topicListeners) {
         TopicListener topicListener = topicListeners.get(job.getType().getId());
-        if (consumers.get(job.getType().getId()).isEmpty()) {
-            topicListener.start();
-        }
         DataConsumer consumer = createConsumer(job);
-        consumer.start(topicListener.getOutput().asFlux());
+        consumer.start(topicListener.getOutput());
         consumers.put(job.getType().getId(), job.getId(), consumer);
     }
 
@@ -123,25 +117,4 @@ public class TopicListeners {
         }
     }
 
-    @Scheduled(fixedRate = CONSUMER_SUPERVISION_INTERVAL_MS)
-    public synchronized void restartNonRunningKafkaTopics() {
-        for (DataConsumer consumer : this.dataConsumers.values()) {
-            if (!consumer.isRunning()) {
-                restartTopicAndConsumers(this.kafkaTopicListeners, this.dataConsumers, consumer);
-            }
-        }
-
-    }
-
-    private static void restartTopicAndConsumers(Map<String, TopicListener> topicListeners,
-            MultiMap<DataConsumer> consumers, DataConsumer consumer) {
-        InfoType type = consumer.getJob().getType();
-        TopicListener topic = topicListeners.get(type.getId());
-        topic.start();
-        restartConsumersOfType(consumers, topic, type);
-    }
-
-    private static void restartConsumersOfType(MultiMap<DataConsumer> consumers, TopicListener topic, InfoType type) {
-        consumers.get(type.getId()).forEach(consumer -> consumer.start(topic.getOutput().asFlux()));
-    }
 }

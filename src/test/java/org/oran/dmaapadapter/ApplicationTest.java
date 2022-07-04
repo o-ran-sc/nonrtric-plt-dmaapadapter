@@ -157,15 +157,23 @@ class ApplicationTest {
     }
 
     @BeforeEach
-    void setPort() {
+    void init() {
         this.applicationConfig.setLocalServerHttpPort(this.localServerHttpPort);
+        assertThat(this.jobs.size()).isZero();
+        assertThat(this.consumerController.testResults.receivedBodies).isEmpty();
+        assertThat(this.consumerController.testResults.receivedHeaders).isEmpty();
     }
 
     @AfterEach
     void reset() {
+        for (Job job : this.jobs.getAll()) {
+            this.icsSimulatorController.deleteJob(job.getId(), restClient());
+        }
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
+
         this.consumerController.testResults.reset();
         this.icsSimulatorController.testResults.reset();
-        this.jobs.clear();
+
     }
 
     private AsyncRestClient restClient(boolean useTrustValidation) {
@@ -298,14 +306,6 @@ class ApplicationTest {
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
         assertThat(consumer.receivedBodies.get(0)).isEqualTo("[\"data\"]");
         assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "application/json");
-
-        // Test send an exception
-        kafkaConsumer.start(Flux.error(new NullPointerException()));
-
-        // Test regular restart of stopped
-        kafkaConsumer.stop();
-        this.topicListeners.restartNonRunningKafkaTopics();
-        await().untilAsserted(() -> assertThat(kafkaConsumer.isRunning()).isTrue());
     }
 
     @Test
@@ -323,19 +323,15 @@ class ApplicationTest {
 
         // Return two messages from DMAAP and verify that these are sent to the owner of
         // the job (consumer)
-        DmaapSimulatorController.addResponse("[\"DmaapResponse1\", \"DmaapResponse2\"]");
+        DmaapSimulatorController.addResponse("[\"DmaapResponse123\", \"DmaapResponse223\"]");
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
-        assertThat(consumer.receivedBodies.get(0)).isEqualTo("[\"DmaapResponse1\", \"DmaapResponse2\"]");
+        assertThat(consumer.receivedBodies.get(0)).isEqualTo("[\"DmaapResponse123\", \"DmaapResponse223\"]");
         assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "application/json");
 
         String jobUrl = baseUrl() + ProducerCallbacksController.JOB_URL;
         String jobs = restClient().get(jobUrl).block();
         assertThat(jobs).contains(JOB_ID);
-
-        // Delete the job
-        this.icsSimulatorController.deleteJob(JOB_ID, restClient());
-        await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
     }
 
     @Test
@@ -353,16 +349,22 @@ class ApplicationTest {
 
         // Return two messages from DMAAP and verify that these are sent to the owner of
         // the job (consumer)
-        DmaapSimulatorController.addResponse("[\"DmaapResponse1\", \"DmaapResponse2\"]");
+        DmaapSimulatorController.addResponse("[\"DmaapResponse11\", \"DmaapResponse22\"]");
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(2));
-        assertThat(consumer.receivedBodies.get(0)).isEqualTo("DmaapResponse1");
-        assertThat(consumer.receivedBodies.get(1)).isEqualTo("DmaapResponse2");
+        assertThat(consumer.receivedBodies.get(0)).isEqualTo("DmaapResponse11");
+        assertThat(consumer.receivedBodies.get(1)).isEqualTo("DmaapResponse22");
         assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "text/plain;charset=UTF-8");
 
         // Delete the job
         this.icsSimulatorController.deleteJob(JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
+
+        // Test that deleting the the last job did not terminate the DmaapTopicListener
+        this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+        DmaapSimulatorController.addResponse("[\"DmaapResponse77\", \"DmaapResponse88\"]");
+        await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(4));
     }
 
     static class PmReportArray extends ArrayList<PmReport> {
@@ -462,18 +464,21 @@ class ApplicationTest {
         DmaapSimulatorController.addResponse("[\"Hello\"]");
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
-        await().untilAsserted(() -> assertThat(consumer.receivedHeaders).hasSize(1));
+        await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
         String received = consumer.receivedBodies.get(0);
         assertThat(received).isEqualTo("Hello");
-        // This is the only time it is verified that mime type is plaintext when isJson
-        // is false and buffering is not used
-        assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "text/plain;charset=UTF-8");
 
         // Check that the auth token was received by the consumer
         assertThat(consumer.receivedHeaders).hasSize(1);
         Map<String, String> headers = consumer.receivedHeaders.get(0);
         assertThat(headers).containsEntry("authorization", "Bearer " + AUTH_TOKEN);
+
+        // This is the only time it is verified that mime type is plaintext when isJson
+        // is false and buffering is not used
+        assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "text/plain;charset=UTF-8");
+
         Files.delete(authFile);
+        this.securityContext.setAuthTokenFilePath(null);
     }
 
     @Test

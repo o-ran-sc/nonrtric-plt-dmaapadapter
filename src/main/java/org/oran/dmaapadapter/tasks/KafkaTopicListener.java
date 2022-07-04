@@ -25,16 +25,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import reactor.core.Disposable;
-import reactor.core.publisher.Sinks;
-import reactor.core.publisher.Sinks.Many;
+import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
 
@@ -47,8 +44,7 @@ public class KafkaTopicListener implements TopicListener {
     private static final Logger logger = LoggerFactory.getLogger(KafkaTopicListener.class);
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
-    private Many<Output> output;
-    private Disposable topicReceiverTask;
+    private Flux<Output> output;
 
     public KafkaTopicListener(ApplicationConfig applicationConfig, InfoType type) {
         this.applicationConfig = applicationConfig;
@@ -56,39 +52,24 @@ public class KafkaTopicListener implements TopicListener {
     }
 
     @Override
-    public Many<Output> getOutput() {
+    public Flux<Output> getOutput() {
+        if (this.output == null) {
+            this.output = createOutput();
+        }
         return this.output;
     }
 
-    @Override
-    public void start() {
-        stop();
-        final int CONSUMER_BACKPRESSURE_BUFFER_SIZE = 1024 * 10;
-        this.output = Sinks.many().multicast().onBackpressureBuffer(CONSUMER_BACKPRESSURE_BUFFER_SIZE);
+    private Flux<Output> createOutput() {
         logger.debug("Listening to kafka topic: {} type :{}", this.type.getKafkaInputTopic(), type.getId());
-        topicReceiverTask = KafkaReceiver.create(kafkaInputProperties()) //
+        return KafkaReceiver.create(kafkaInputProperties()) //
                 .receive() //
-                .doOnNext(this::onReceivedData) //
-                .subscribe(null, //
-                        this::onReceivedError, //
-                        () -> logger.warn("KafkaTopicReceiver stopped"));
-    }
-
-    @Override
-    public void stop() {
-        if (topicReceiverTask != null) {
-            topicReceiverTask.dispose();
-            topicReceiverTask = null;
-        }
-    }
-
-    private void onReceivedData(ConsumerRecord<String, String> input) {
-        logger.debug("Received from kafka topic: {} :{}", this.type.getKafkaInputTopic(), input.value());
-        output.emitNext(new Output(input.key(), input.value()), Sinks.EmitFailureHandler.FAIL_FAST);
-    }
-
-    private void onReceivedError(Throwable t) {
-        logger.error("KafkaTopicReceiver error: {}", t.getMessage());
+                .doOnNext(input -> logger.debug("Received from kafka topic: {} :{}", this.type.getKafkaInputTopic(),
+                        input.value())) //
+                .doOnError(t -> logger.error("KafkaTopicReceiver error: {}", t.getMessage())) //
+                .doFinally(sig -> logger.error("KafkaTopicReceiver stopped, reason: {}", sig)) //
+                .publish() //
+                .autoConnect() //
+                .map(input -> new Output(input.key(), input.value())); //
     }
 
     private ReceiverOptions<String, String> kafkaInputProperties() {
@@ -100,6 +81,7 @@ public class KafkaTopicListener implements TopicListener {
         consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "osc-dmaap-adapter");
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
 
         return ReceiverOptions.<String, String>create(consumerProps)
                 .subscription(Collections.singleton(this.type.getKafkaInputTopic()));
