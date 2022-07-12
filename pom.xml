@@ -60,13 +60,7 @@
         <jacoco-maven-plugin.version>0.8.5</jacoco-maven-plugin.version>
         <exec.skip>true</exec.skip>
     </properties>
-    <dependencies>
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-ui</artifactId>
-            <version>1.6.3</version>
-            <scope>test</scope>
-        </dependency>
+    <dependencies>     
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -137,6 +131,12 @@
         </dependency>
         <!-- TEST -->
         <!-- https://mvnrepository.com/artifact/com.github.erosb/everit-json-schema -->
+        <dependency>         
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-ui</artifactId>
+            <version>1.6.3</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.github.erosb</groupId>
             <artifactId>everit-json-schema</artifactId>

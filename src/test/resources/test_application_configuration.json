@@ -8,7 +8,7 @@
       },
       {
          "id": "KafkaInformationType",
-         "kafkaInputTopic": "TutorialTopic",
+         "kafkaInputTopic": "KafkaInput",
          "useHttpProxy": false
       },
       {
@@ -20,7 +20,7 @@
       },
       {
          "id": "PmInformationTypeKafka",
-         "kafkaInputTopic": "TutorialTopic",
+         "kafkaInputTopic": "KafkaPmInput",
          "useHttpProxy": false,
          "dataType": "PmData",
          "isJson": true
