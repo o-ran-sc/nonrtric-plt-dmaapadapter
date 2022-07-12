@@ -20,10 +20,10 @@
 
 package org.oran.dmaapadapter.repository.filters;
 
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import lombok.Getter;
@@ -37,10 +37,10 @@ public class PmReportFilter implements Filter {
 
     @Getter
     public static class FilterData {
-        Collection<String> sourceNames = new ArrayList<>();
-        Collection<String> measObjInstIds = new ArrayList<>();
-        Collection<String> measTypes = new ArrayList<>();
-        Collection<String> measuredEntityDns = new ArrayList<>();
+        final Collection<String> sourceNames = new HashSet<>();
+        final Collection<String> measObjInstIds = new ArrayList<>();
+        final Collection<String> measTypes = new HashSet<>();
+        final Collection<String> measuredEntityDns = new ArrayList<>();
     }
 
     private static class MeasTypesIndexed extends PmReport.MeasTypes {
@@ -119,7 +119,7 @@ public class PmReportFilter implements Filter {
 
         PmReport.MeasValuesList newMeasValuesList = oldMeasValues.shallowClone();
 
-        if (isContainedInAny(oldMeasValues.measObjInstId, filter.measObjInstIds) || filter.measObjInstIds.isEmpty()) {
+        if (filter.measObjInstIds.isEmpty() || isContainedInAny(oldMeasValues.measObjInstId, filter.measObjInstIds)) {
             newMeasValuesList.measResults = createMeasResults(oldMeasValues.measResults, measTypes, filter);
         }
         return newMeasValuesList;
