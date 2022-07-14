@@ -26,15 +26,15 @@ import reactor.core.publisher.Flux;
 public interface TopicListener {
 
     @ToString
-    public static class Output {
+    public static class DataFromTopic {
         public final String key;
         public final String value;
 
-        public Output(String key, String value) {
+        public DataFromTopic(String key, String value) {
             this.key = key;
             this.value = value;
         }
     }
 
-    public Flux<Output> getOutput();
+    public Flux<DataFromTopic> getFlux();
 }

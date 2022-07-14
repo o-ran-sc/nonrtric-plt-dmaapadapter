@@ -54,7 +54,7 @@ public class KafkaDataConsumer extends DataConsumer {
     }
 
     @Override
-    protected Mono<String> sendToClient(TopicListener.Output data) {
+    protected Mono<String> sendToClient(DataToConsumer data) {
         Job job = this.getJob();
 
         logger.debug("Sending data '{}' to Kafka topic: {}", data, this.getJob().getParameters().getKafkaOutputTopic());
@@ -67,7 +67,7 @@ public class KafkaDataConsumer extends DataConsumer {
     }
 
     @Override
-    public synchronized void start(Flux<TopicListener.Output> input) {
+    public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
         super.start(input);
         SenderOptions<String, String> senderOptions = senderOptions(appConfig);
         this.sender = KafkaSender.create(senderOptions);
@@ -93,7 +93,7 @@ public class KafkaDataConsumer extends DataConsumer {
         return SenderOptions.create(props);
     }
 
-    private SenderRecord<String, String, Integer> senderRecord(TopicListener.Output output, Job infoJob) {
+    private SenderRecord<String, String, Integer> senderRecord(DataToConsumer output, Job infoJob) {
         int correlationMetadata = 2;
         String topic = infoJob.getParameters().getKafkaOutputTopic();
         return SenderRecord.create(new ProducerRecord<>(topic, output.key, output.value), correlationMetadata);

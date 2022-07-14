@@ -44,7 +44,7 @@ public class KafkaTopicListener implements TopicListener {
     private static final Logger logger = LoggerFactory.getLogger(KafkaTopicListener.class);
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
-    private Flux<Output> output;
+    private Flux<DataFromTopic> output;
 
     public KafkaTopicListener(ApplicationConfig applicationConfig, InfoType type) {
         this.applicationConfig = applicationConfig;
@@ -52,14 +52,14 @@ public class KafkaTopicListener implements TopicListener {
     }
 
     @Override
-    public Flux<Output> getOutput() {
+    public Flux<DataFromTopic> getFlux() {
         if (this.output == null) {
             this.output = createOutput();
         }
         return this.output;
     }
 
-    private Flux<Output> createOutput() {
+    private Flux<DataFromTopic> createOutput() {
         logger.debug("Listening to kafka topic: {} type :{}", this.type.getKafkaInputTopic(), type.getId());
         return KafkaReceiver.create(kafkaInputProperties()) //
                 .receive() //
@@ -69,7 +69,7 @@ public class KafkaTopicListener implements TopicListener {
                 .doFinally(sig -> logger.error("KafkaTopicReceiver stopped, reason: {}", sig)) //
                 .publish() //
                 .autoConnect() //
-                .map(input -> new Output(input.key(), input.value())); //
+                .map(input -> new DataFromTopic(input.key(), input.value())); //
     }
 
     private ReceiverOptions<String, String> kafkaInputProperties() {

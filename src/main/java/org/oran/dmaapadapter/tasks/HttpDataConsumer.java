@@ -39,7 +39,7 @@ public class HttpDataConsumer extends DataConsumer {
     }
 
     @Override
-    protected Mono<String> sendToClient(TopicListener.Output output) {
+    protected Mono<String> sendToClient(DataToConsumer output) {
         Job job = this.getJob();
         logger.debug("Sending to consumer {} {} {}", job.getId(), job.getCallbackUrl(), output);
         MediaType contentType = job.isBuffered() || job.getType().isJson() ? MediaType.APPLICATION_JSON : null;

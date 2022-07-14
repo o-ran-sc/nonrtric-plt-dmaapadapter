@@ -101,7 +101,7 @@ public class TopicListeners {
     private void addConsumer(Job job, MultiMap<DataConsumer> consumers, Map<String, TopicListener> topicListeners) {
         TopicListener topicListener = topicListeners.get(job.getType().getId());
         DataConsumer consumer = createConsumer(job);
-        consumer.start(topicListener.getOutput());
+        consumer.start(topicListener.getFlux());
         consumers.put(job.getType().getId(), job.getId(), consumer);
     }
 
