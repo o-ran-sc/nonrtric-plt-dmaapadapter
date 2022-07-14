@@ -158,7 +158,7 @@ class IntegrationWithKafka {
 
     private static class KafkaReceiver {
         public final String OUTPUT_TOPIC;
-        private TopicListener.Output receivedKafkaOutput;
+        private TopicListener.DataFromTopic receivedKafkaOutput;
         private final Logger logger = LoggerFactory.getLogger(IntegrationWithKafka.class);
 
         int count = 0;
@@ -171,13 +171,13 @@ class IntegrationWithKafka {
             InfoType type = new InfoType("id", null, false, OUTPUT_TOPIC, "dataType", false);
             KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type);
 
-            topicListener.getOutput() //
+            topicListener.getFlux() //
                     .doOnNext(this::set) //
                     .doFinally(sig -> logger.info("Finally " + sig)) //
                     .subscribe();
         }
 
-        private void set(TopicListener.Output receivedKafkaOutput) {
+        private void set(TopicListener.DataFromTopic receivedKafkaOutput) {
             this.receivedKafkaOutput = receivedKafkaOutput;
             this.count++;
             logger.debug("*** received {}, {}", OUTPUT_TOPIC, receivedKafkaOutput);
@@ -193,7 +193,7 @@ class IntegrationWithKafka {
 
         void reset() {
             count = 0;
-            this.receivedKafkaOutput = new TopicListener.Output("", "");
+            this.receivedKafkaOutput = new TopicListener.DataFromTopic("", "");
         }
     }
 

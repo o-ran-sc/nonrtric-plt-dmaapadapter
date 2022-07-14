@@ -45,7 +45,7 @@ public class DmaapTopicListener implements TopicListener {
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
     private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
-    private Flux<Output> output;
+    private Flux<DataFromTopic> dataFromDmaap;
 
     public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type, SecurityContext securityContext) {
         AsyncRestClientFactory restclientFactory =
@@ -56,14 +56,14 @@ public class DmaapTopicListener implements TopicListener {
     }
 
     @Override
-    public Flux<Output> getOutput() {
-        if (this.output == null) {
-            this.output = createOutput();
+    public Flux<DataFromTopic> getFlux() {
+        if (this.dataFromDmaap == null) {
+            this.dataFromDmaap = startFetchFromDmaap();
         }
-        return this.output;
+        return this.dataFromDmaap;
     }
 
-    private Flux<Output> createOutput() {
+    private Flux<DataFromTopic> startFetchFromDmaap() {
         return Flux.range(0, Integer.MAX_VALUE) //
                 .flatMap(notUsed -> getFromMessageRouter(getDmaapUrl()), 1) //
                 .doOnNext(input -> logger.debug("Received from DMaap: {} :{}", this.type.getDmaapTopicUrl(), input)) //
@@ -71,7 +71,7 @@ public class DmaapTopicListener implements TopicListener {
                 .doFinally(sig -> logger.error("DmaapTopicListener stopped, reason: {}", sig)) //
                 .publish() //
                 .autoConnect() //
-                .map(input -> new Output("", input)); //
+                .map(input -> new DataFromTopic("", input)); //
     }
 
     private String getDmaapUrl() {

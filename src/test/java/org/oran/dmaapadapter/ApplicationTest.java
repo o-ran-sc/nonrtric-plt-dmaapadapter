@@ -300,7 +300,7 @@ class ApplicationTest {
 
         // Handle received data from Kafka, check that it has been posted to the
         // consumer
-        kafkaConsumer.start(Flux.just(new TopicListener.Output("key", "data")));
+        kafkaConsumer.start(Flux.just(new TopicListener.DataFromTopic("key", "data")));
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));

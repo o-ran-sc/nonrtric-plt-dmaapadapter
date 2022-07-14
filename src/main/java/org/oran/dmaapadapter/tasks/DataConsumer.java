@@ -21,6 +21,7 @@
 package org.oran.dmaapadapter.tasks;
 
 import lombok.Getter;
+import lombok.ToString;
 
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
@@ -42,6 +43,17 @@ public abstract class DataConsumer {
     private final Job job;
     private Disposable subscription;
     private final ErrorStats errorStats = new ErrorStats();
+
+    @ToString
+    public static class DataToConsumer {
+        public final String key;
+        public final String value;
+
+        public DataToConsumer(String key, String value) {
+            this.key = key;
+            this.value = value;
+        }
+    }
 
     private class ErrorStats {
         private int consumerFaultCounter = 0;
@@ -73,7 +85,7 @@ public abstract class DataConsumer {
         this.job = job;
     }
 
-    public synchronized void start(Flux<TopicListener.Output> input) {
+    public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
         stop();
         this.errorStats.resetIrrecoverableErrors();
         this.subscription = handleReceivedMessage(input, job) //
@@ -89,7 +101,7 @@ public abstract class DataConsumer {
         stop();
     }
 
-    protected abstract Mono<String> sendToClient(TopicListener.Output output);
+    protected abstract Mono<String> sendToClient(DataToConsumer output);
 
     public synchronized void stop() {
         if (this.subscription != null) {
@@ -102,17 +114,16 @@ public abstract class DataConsumer {
         return this.subscription != null;
     }
 
-    private Flux<TopicListener.Output> handleReceivedMessage(Flux<TopicListener.Output> inputFlux, Job job) {
-        Flux<TopicListener.Output> result =
-                inputFlux.map(input -> new TopicListener.Output(input.key, job.filter(input.value))) //
-                        .filter(t -> !t.value.isEmpty()); //
+    private Flux<DataToConsumer> handleReceivedMessage(Flux<TopicListener.DataFromTopic> inputFlux, Job job) {
+        Flux<DataToConsumer> result = inputFlux.map(input -> new DataToConsumer(input.key, job.filter(input.value))) //
+                .filter(t -> !t.value.isEmpty()); //
 
         if (job.isBuffered()) {
             result = result.map(input -> quoteNonJson(input.value, job)) //
                     .bufferTimeout( //
                             job.getParameters().getBufferTimeout().getMaxSize(), //
                             job.getParameters().getBufferTimeout().getMaxTime()) //
-                    .map(buffered -> new TopicListener.Output("", buffered.toString()));
+                    .map(buffered -> new DataToConsumer("", buffered.toString()));
         }
         return result;
     }
