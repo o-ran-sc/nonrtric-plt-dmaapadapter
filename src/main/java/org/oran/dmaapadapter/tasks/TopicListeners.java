@@ -49,7 +49,7 @@ public class TopicListeners {
     private final Map<String, TopicListener> dmaapTopicListeners = new HashMap<>(); // Key is typeId
 
     @Getter
-    private final MultiMap<DataConsumer> dataConsumers = new MultiMap<>(); // Key is typeId, jobId
+    private final MultiMap<JobDataDistributor> dataDistributors = new MultiMap<>(); // Key is typeId, jobId
 
     private final ApplicationConfig appConfig;
 
@@ -85,35 +85,36 @@ public class TopicListeners {
         removeJob(job);
         logger.debug("Job added {}", job.getId());
         if (job.getType().isKafkaTopicDefined()) {
-            addConsumer(job, dataConsumers, kafkaTopicListeners);
+            addConsumer(job, dataDistributors, kafkaTopicListeners);
         }
 
         if (job.getType().isDmaapTopicDefined()) {
-            addConsumer(job, dataConsumers, dmaapTopicListeners);
+            addConsumer(job, dataDistributors, dmaapTopicListeners);
         }
     }
 
-    private DataConsumer createConsumer(Job job) {
-        return !Strings.isEmpty(job.getParameters().getKafkaOutputTopic()) ? new KafkaDataConsumer(job, appConfig)
-                : new HttpDataConsumer(job);
+    private JobDataDistributor createConsumer(Job job) {
+        return !Strings.isEmpty(job.getParameters().getKafkaOutputTopic()) ? new KafkaJobDataDistributor(job, appConfig)
+                : new HttpJobDataDistributor(job);
     }
 
-    private void addConsumer(Job job, MultiMap<DataConsumer> consumers, Map<String, TopicListener> topicListeners) {
+    private void addConsumer(Job job, MultiMap<JobDataDistributor> distributors,
+            Map<String, TopicListener> topicListeners) {
         TopicListener topicListener = topicListeners.get(job.getType().getId());
-        DataConsumer consumer = createConsumer(job);
-        consumer.start(topicListener.getFlux());
-        consumers.put(job.getType().getId(), job.getId(), consumer);
+        JobDataDistributor distributor = createConsumer(job);
+        distributor.start(topicListener.getFlux());
+        distributors.put(job.getType().getId(), job.getId(), distributor);
     }
 
     public synchronized void removeJob(Job job) {
-        removeJob(job, dataConsumers);
+        removeJob(job, dataDistributors);
     }
 
-    private static void removeJob(Job job, MultiMap<DataConsumer> consumers) {
-        DataConsumer consumer = consumers.remove(job.getType().getId(), job.getId());
-        if (consumer != null) {
+    private static void removeJob(Job job, MultiMap<JobDataDistributor> distributors) {
+        JobDataDistributor distributor = distributors.remove(job.getType().getId(), job.getId());
+        if (distributor != null) {
             logger.debug("Job removed {}", job.getId());
-            consumer.stop();
+            distributor.stop();
         }
     }
 

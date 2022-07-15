@@ -42,13 +42,13 @@ import reactor.kafka.sender.SenderRecord;
  * owner via REST calls.
  */
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
-public class KafkaDataConsumer extends DataConsumer {
-    private static final Logger logger = LoggerFactory.getLogger(KafkaDataConsumer.class);
+public class KafkaJobDataDistributor extends JobDataDistributor {
+    private static final Logger logger = LoggerFactory.getLogger(KafkaJobDataDistributor.class);
 
     private KafkaSender<String, String> sender;
     private final ApplicationConfig appConfig;
 
-    public KafkaDataConsumer(Job job, ApplicationConfig appConfig) {
+    public KafkaJobDataDistributor(Job job, ApplicationConfig appConfig) {
         super(job);
         this.appConfig = appConfig;
     }

@@ -37,8 +37,8 @@ import reactor.core.publisher.Mono;
  * owner via REST calls.
  */
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
-public abstract class DataConsumer {
-    private static final Logger logger = LoggerFactory.getLogger(DataConsumer.class);
+public abstract class JobDataDistributor {
+    private static final Logger logger = LoggerFactory.getLogger(JobDataDistributor.class);
     @Getter
     private final Job job;
     private Disposable subscription;
@@ -81,7 +81,7 @@ public abstract class DataConsumer {
         }
     }
 
-    protected DataConsumer(Job job) {
+    protected JobDataDistributor(Job job) {
         this.job = job;
     }
 
@@ -91,7 +91,7 @@ public abstract class DataConsumer {
         this.subscription = handleReceivedMessage(input, job) //
                 .flatMap(this::sendToClient, job.getParameters().getMaxConcurrency()) //
                 .onErrorResume(this::handleError) //
-                .subscribe(this::handleConsumerSentOk, //
+                .subscribe(this::handleSentOk, //
                         this::handleExceptionInStream, //
                         () -> logger.warn("HttpDataConsumer stopped jobId: {}", job.getId()));
     }
@@ -147,7 +147,7 @@ public abstract class DataConsumer {
         }
     }
 
-    private void handleConsumerSentOk(String data) {
+    private void handleSentOk(String data) {
         this.errorStats.handleOkFromConsumer();
     }
 

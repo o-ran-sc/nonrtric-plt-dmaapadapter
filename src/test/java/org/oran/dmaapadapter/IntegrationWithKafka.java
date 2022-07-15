@@ -216,7 +216,7 @@ class IntegrationWithKafka {
             this.icsSimulatorController.deleteJob(job.getId(), restClient());
         }
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
-        await().untilAsserted(() -> assertThat(this.topicListeners.getDataConsumers().keySet()).isEmpty());
+        await().untilAsserted(() -> assertThat(this.topicListeners.getDataDistributors().keySet()).isEmpty());
 
         this.consumerController.testResults.reset();
         this.icsSimulatorController.testResults.reset();
