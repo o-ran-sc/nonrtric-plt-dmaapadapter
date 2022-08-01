@@ -66,7 +66,6 @@ public class ProducerRegstrationTask {
     private final InfoTypes types;
     private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
 
-    private static final String PRODUCER_ID = "DmaapGenericInfoProducer";
     @Getter
     private boolean isRegisteredInIcs = false;
     private static final int REGISTRATION_SUPERVISION_INTERVAL_MS = 1000 * 10;
@@ -102,9 +101,13 @@ public class ProducerRegstrationTask {
         logger.warn("Registration of producer failed {}", t.getMessage());
     }
 
+    private String producerId() {
+        return this.applicationConfig.getSelfUrl().replace("/", "_");
+    }
+
     // Returns TRUE if registration is correct
     private Mono<Boolean> checkRegistration() {
-        final String url = applicationConfig.getIcsBaseUrl() + "/data-producer/v1/info-producers/" + PRODUCER_ID;
+        final String url = applicationConfig.getIcsBaseUrl() + "/data-producer/v1/info-producers/" + producerId();
         return restClient.get(url) //
                 .flatMap(this::isRegisterredInfoCorrect) //
                 .onErrorResume(t -> Mono.just(Boolean.FALSE));
@@ -127,7 +130,7 @@ public class ProducerRegstrationTask {
     private Mono<String> registerTypesAndProducer() {
         final int CONCURRENCY = 20;
         final String producerUrl =
-                applicationConfig.getIcsBaseUrl() + "/data-producer/v1/info-producers/" + PRODUCER_ID;
+                applicationConfig.getIcsBaseUrl() + "/data-producer/v1/info-producers/" + producerId();
 
         return Flux.fromIterable(this.types.getAll()) //
                 .doOnNext(type -> logger.info("Registering type {}", type.getId())) //

@@ -448,7 +448,7 @@ class IntegrationWithKafka {
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
     @Test
     void kafkaCharacteristics_pmFilter() throws Exception {
-        // Filter PM reports and senttotowjobs over Kafka
+        // Filter PM reports and sent to two jobs over Kafka
 
         final String JOB_ID = "kafkaCharacteristics";
         final String JOB_ID2 = "kafkaCharacteristics2";
