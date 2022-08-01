@@ -28,6 +28,14 @@
                         }
                      ]
                   },
+                  "measObjClass": {
+                     "type": "array",
+                     "items": [
+                        {
+                           "type": "string"
+                        }
+                     ]
+                  },
                   "measTypes": {
                      "type": "array",
                      "items": [
