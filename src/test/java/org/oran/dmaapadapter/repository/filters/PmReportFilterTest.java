@@ -68,6 +68,21 @@ class PmReportFilterTest {
     }
 
     @Test
+    void testMeasObjClass() throws Exception {
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        filterData.measObjClass.add("junk");
+        PmReportFilter filter = new PmReportFilter(filterData);
+        String filtered = filter.filter(loadReport());
+        assertThat(filtered).isEmpty();
+
+        filterData = new PmReportFilter.FilterData();
+        filterData.measObjClass.add("ENodeBFunction");
+        filter = new PmReportFilter(filterData);
+        filtered = filter.filter(loadReport());
+        assertThat(filtered).contains("ENodeBFunction").doesNotContain("UtranCell");
+    }
+
+    @Test
     void testSourceNames() throws Exception {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.sourceNames.add("junk");
@@ -99,7 +114,7 @@ class PmReportFilterTest {
 
     @Test
     void testParse() throws Exception {
-        com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+        com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
         PmReport report = gson.fromJson(loadReport(), PmReport.class);
 
         String dn = report.event.perf3gppFields.measDataCollection.measuredEntityDn;

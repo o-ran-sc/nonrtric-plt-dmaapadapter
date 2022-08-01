@@ -84,7 +84,7 @@ class IntegrationWithIcs {
     @Autowired
     private SecurityContext securityContext;
 
-    private static Gson gson = new GsonBuilder().create();
+    private static Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 
     static class TestApplicationConfig extends ApplicationConfig {
 

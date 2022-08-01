@@ -35,6 +35,7 @@ import reactor.core.publisher.Mono;
 
 public class ErrorResponse {
     private static Gson gson = new GsonBuilder() //
+            .disableHtmlEscaping() //
             .create(); //
 
     // Returned as body for all failed REST calls

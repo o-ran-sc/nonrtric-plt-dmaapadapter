@@ -44,7 +44,7 @@ public class DmaapTopicListener implements TopicListener {
     private final AsyncRestClient dmaapRestClient;
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
-    private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+    private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
     private Flux<DataFromTopic> dataFromDmaap;
 
     public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type, SecurityContext securityContext) {

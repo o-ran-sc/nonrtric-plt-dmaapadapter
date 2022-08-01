@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 @ToString
 public class Job {
 
-    private static com.google.gson.Gson gson = new GsonBuilder().create();
+    private static com.google.gson.Gson gson = new GsonBuilder().disableHtmlEscaping().create();
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     public static class Parameters {

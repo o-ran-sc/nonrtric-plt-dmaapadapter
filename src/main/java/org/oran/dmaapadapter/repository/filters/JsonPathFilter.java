@@ -29,7 +29,7 @@ public class JsonPathFilter implements Filter {
 
     private String expression;
     private static final Logger logger = LoggerFactory.getLogger(JsonPathFilter.class);
-    com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+    com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
 
     public JsonPathFilter(String exp) {
         try {

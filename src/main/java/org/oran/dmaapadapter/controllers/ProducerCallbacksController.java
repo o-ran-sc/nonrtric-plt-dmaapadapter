@@ -61,7 +61,7 @@ public class ProducerCallbacksController {
     public static final String API_DESCRIPTION = "";
     public static final String JOB_URL = "/generic_dataproducer/info_job";
     public static final String SUPERVISION_URL = "/generic_dataproducer/health_check";
-    private static Gson gson = new GsonBuilder().create();
+    private static Gson gson = new GsonBuilder().disableHtmlEscaping().create();
     private final Jobs jobs;
     private final InfoTypes types;
 

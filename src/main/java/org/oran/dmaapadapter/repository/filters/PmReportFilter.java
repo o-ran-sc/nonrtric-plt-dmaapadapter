@@ -32,7 +32,7 @@ import org.thymeleaf.util.StringUtils;
 
 public class PmReportFilter implements Filter {
 
-    private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+    private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
     private final FilterData filterData;
 
     @Getter
@@ -41,6 +41,7 @@ public class PmReportFilter implements Filter {
         final Collection<String> measObjInstIds = new ArrayList<>();
         final Collection<String> measTypes = new HashSet<>();
         final Collection<String> measuredEntityDns = new ArrayList<>();
+        final Collection<String> measObjClass = new HashSet<>();
     }
 
     private static class MeasTypesIndexed extends PmReport.MeasTypes {
@@ -114,12 +115,38 @@ public class PmReportFilter implements Filter {
         return newMeasResults;
     }
 
+    private boolean isMeasInstIdMatch(String measObjInstId, FilterData filter) {
+        return filter.measObjInstIds.isEmpty() || isContainedInAny(measObjInstId, filter.measObjInstIds);
+    }
+
+    private String managedObjectClass(String distinguishedName) {
+        int lastRdn = distinguishedName.lastIndexOf(",");
+        if (lastRdn == -1) {
+            return "";
+        }
+        int lastEqualChar = distinguishedName.indexOf("=", lastRdn);
+        if (lastEqualChar == -1) {
+            return "";
+        }
+        return distinguishedName.substring(lastRdn + 1, lastEqualChar);
+    }
+
+    private boolean isMeasInstClassMatch(String measObjInstId, FilterData filter) {
+        if (filter.measObjClass.isEmpty()) {
+            return true;
+        }
+
+        String measObjClass = managedObjectClass(measObjInstId);
+        return filter.measObjClass.contains(measObjClass);
+    }
+
     private PmReport.MeasValuesList createMeasValuesList(PmReport.MeasValuesList oldMeasValues,
             PmReport.MeasTypes measTypes, FilterData filter) {
 
         PmReport.MeasValuesList newMeasValuesList = oldMeasValues.shallowClone();
 
-        if (filter.measObjInstIds.isEmpty() || isContainedInAny(oldMeasValues.measObjInstId, filter.measObjInstIds)) {
+        if (isMeasInstIdMatch(oldMeasValues.measObjInstId, filter)
+                && isMeasInstClassMatch(oldMeasValues.measObjInstId, filter)) {
             newMeasValuesList.measResults = createMeasResults(oldMeasValues.measResults, measTypes, filter);
         }
         return newMeasValuesList;
