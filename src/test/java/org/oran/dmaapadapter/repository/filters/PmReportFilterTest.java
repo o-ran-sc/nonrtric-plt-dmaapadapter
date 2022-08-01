@@ -68,6 +68,21 @@ class PmReportFilterTest {
     }
 
     @Test
+    void testMeasObjClass() throws Exception {
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        filterData.measObjClass.add("junk");
+        PmReportFilter filter = new PmReportFilter(filterData);
+        String filtered = filter.filter(loadReport());
+        assertThat(filtered).isEmpty();
+
+        filterData = new PmReportFilter.FilterData();
+        filterData.measObjClass.add("ENodeBFunction");
+        filter = new PmReportFilter(filterData);
+        filtered = filter.filter(loadReport());
+        assertThat(filtered).contains("ENodeBFunction").doesNotContain("UtranCell");
+    }
+
+    @Test
     void testSourceNames() throws Exception {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.sourceNames.add("junk");

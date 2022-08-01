@@ -66,7 +66,6 @@ public class ProducerRegstrationTask {
     private final InfoTypes types;
     private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
 
-    private static final String PRODUCER_ID = "DmaapGenericInfoProducer";
     @Getter
     private boolean isRegisteredInIcs = false;
     private static final int REGISTRATION_SUPERVISION_INTERVAL_MS = 1000 * 10;
@@ -102,10 +101,14 @@ public class ProducerRegstrationTask {
         logger.warn("Registration of producer failed {}", t.getMessage());
     }
 
+    private String producerRegistrationUrl() {
+        final String producerId = this.applicationConfig.getSelfUrl().replace("/", "_");
+        return applicationConfig.getIcsBaseUrl() + "/data-producer/v1/info-producers/" + producerId;
+    }
+
     // Returns TRUE if registration is correct
     private Mono<Boolean> checkRegistration() {
-        final String url = applicationConfig.getIcsBaseUrl() + "/data-producer/v1/info-producers/" + PRODUCER_ID;
-        return restClient.get(url) //
+        return restClient.get(producerRegistrationUrl()) //
                 .flatMap(this::isRegisterredInfoCorrect) //
                 .onErrorResume(t -> Mono.just(Boolean.FALSE));
     }
@@ -126,8 +129,6 @@ public class ProducerRegstrationTask {
 
     private Mono<String> registerTypesAndProducer() {
         final int CONCURRENCY = 20;
-        final String producerUrl =
-                applicationConfig.getIcsBaseUrl() + "/data-producer/v1/info-producers/" + PRODUCER_ID;
 
         return Flux.fromIterable(this.types.getAll()) //
                 .doOnNext(type -> logger.info("Registering type {}", type.getId())) //
@@ -135,7 +136,7 @@ public class ProducerRegstrationTask {
                         CONCURRENCY) //
                 .collectList() //
                 .doOnNext(type -> logger.info("Registering producer")) //
-                .flatMap(resp -> restClient.put(producerUrl, gson.toJson(producerRegistrationInfo())));
+                .flatMap(resp -> restClient.put(producerRegistrationUrl(), gson.toJson(producerRegistrationInfo())));
     }
 
     private Object typeSpecifcInfoObject() {
