@@ -20,8 +20,6 @@
 
 package org.oran.dmaapadapter.repository;
 
-import com.google.gson.GsonBuilder;
-
 import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 
@@ -30,18 +28,13 @@ import lombok.Setter;
 import lombok.ToString;
 
 import org.oran.dmaapadapter.clients.AsyncRestClient;
-import org.oran.dmaapadapter.repository.filters.Filter;
-import org.oran.dmaapadapter.repository.filters.JsltFilter;
-import org.oran.dmaapadapter.repository.filters.JsonPathFilter;
-import org.oran.dmaapadapter.repository.filters.PmReportFilter;
-import org.oran.dmaapadapter.repository.filters.RegexpFilter;
+import org.oran.dmaapadapter.filter.Filter;
+import org.oran.dmaapadapter.filter.FilterFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @ToString
 public class Job {
-
-    private static com.google.gson.Gson gson = new GsonBuilder().disableHtmlEscaping().create();
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     public static class Parameters {
@@ -52,6 +45,7 @@ public class Job {
 
         @Setter
         private String filterType = REGEXP_TYPE;
+        @Getter
         private Object filter;
         @Getter
         private BufferTimeout bufferTimeout;
@@ -76,33 +70,20 @@ public class Job {
             return maxConcurrency == null || maxConcurrency == 0 ? 1 : maxConcurrency;
         }
 
-        public String getFilterAsString() {
-            return this.filter.toString();
-        }
-
-        public PmReportFilter.FilterData getPmFilter() {
-            String str = gson.toJson(this.filter);
-            return gson.fromJson(str, PmReportFilter.FilterData.class);
-        }
-
-        public enum FilterType {
-            REGEXP, JSLT, JSON_PATH, PM_DATA, NONE
-        }
-
-        public FilterType getFilterType() {
+        public Filter.Type getFilterType() {
             if (filter == null || filterType == null) {
-                return FilterType.NONE;
+                return Filter.Type.NONE;
             } else if (filterType.equalsIgnoreCase(JSLT_FILTER_TYPE)) {
-                return FilterType.JSLT;
+                return Filter.Type.JSLT;
             } else if (filterType.equalsIgnoreCase(JSON_PATH_FILTER_TYPE)) {
-                return FilterType.JSON_PATH;
+                return Filter.Type.JSON_PATH;
             } else if (filterType.equalsIgnoreCase(REGEXP_TYPE)) {
-                return FilterType.REGEXP;
+                return Filter.Type.REGEXP;
             } else if (filterType.equalsIgnoreCase(PM_FILTER_TYPE)) {
-                return FilterType.PM_DATA;
+                return Filter.Type.PM_DATA;
             } else {
                 logger.warn("Unsupported filter type: {}", this.filterType);
-                return FilterType.NONE;
+                return Filter.Type.NONE;
             }
         }
     }
@@ -156,31 +137,9 @@ public class Job {
         this.owner = owner;
         this.lastUpdated = lastUpdated;
         this.parameters = parameters;
-        filter = createFilter(parameters);
+        filter = parameters.filter == null ? null
+                : FilterFactory.create(parameters.getFilter(), parameters.getFilterType());
         this.consumerRestClient = consumerRestClient;
-    }
-
-    private static Filter createFilter(Parameters parameters) {
-
-        if (parameters.filter == null) {
-            return null;
-        }
-
-        switch (parameters.getFilterType()) {
-            case PM_DATA:
-                return new PmReportFilter(parameters.getPmFilter());
-            case REGEXP:
-                return new RegexpFilter(parameters.getFilterAsString());
-            case JSLT:
-                return new JsltFilter(parameters.getFilterAsString());
-            case JSON_PATH:
-                return new JsonPathFilter(parameters.getFilterAsString());
-            case NONE:
-                return null;
-            default:
-                logger.error("Not handeled filter type: {}", parameters.getFilterType());
-                return null;
-        }
     }
 
     public String filter(String data) {

@@ -18,7 +18,7 @@
  * ========================LICENSE_END===================================
  */
 
-package org.oran.dmaapadapter.repository.filters;
+package org.oran.dmaapadapter.filter;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -31,7 +31,7 @@ import com.schibsted.spt.data.jslt.Parser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JsltFilter implements Filter {
+class JsltFilter implements Filter {
 
     private Expression expression;
     private final ObjectMapper mapper = new ObjectMapper();
