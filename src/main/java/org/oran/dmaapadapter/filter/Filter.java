@@ -18,29 +18,14 @@
  * ========================LICENSE_END===================================
  */
 
-package org.oran.dmaapadapter.repository.filters;
+package org.oran.dmaapadapter.filter;
 
-import static org.assertj.core.api.Assertions.assertThat;
+public interface Filter {
 
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import org.junit.jupiter.api.Test;
-
-class JsonPathFilterTest {
-
-    @Test
-    void testJsonPath() throws Exception {
-        String exp = ("$.event.perf3gppFields.measDataCollection.measInfoList[0].measTypes.sMeasTypesList[0]");
-        JsonPathFilter filter = new JsonPathFilter(exp);
-        String res = filter.filter(loadReport());
-        assertThat(res).isEqualTo("\"attTCHSeizures\"");
+    public enum Type {
+        REGEXP, JSLT, JSON_PATH, PM_DATA, NONE
     }
 
-    private String loadReport() throws Exception {
-        String path = "./src/test/resources/pm_report.json";
-        return Files.readString(Path.of(path), Charset.defaultCharset());
-    }
+    public String filter(String data);
 
 }

@@ -18,35 +18,38 @@
  * ========================LICENSE_END===================================
  */
 
-package org.oran.dmaapadapter.repository.filters;
+package org.oran.dmaapadapter.filter;
 
-import com.jayway.jsonpath.JsonPath;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JsonPathFilter implements Filter {
+class RegexpFilter implements Filter {
+    private static final Logger logger = LoggerFactory.getLogger(RegexpFilter.class);
+    private Pattern regexp;
 
-    private String expression;
-    private static final Logger logger = LoggerFactory.getLogger(JsonPathFilter.class);
-    com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
-
-    public JsonPathFilter(String exp) {
+    public RegexpFilter(String exp) {
         try {
-            expression = exp;
+            regexp = Pattern.compile(exp);
         } catch (Exception e) {
-            logger.warn("Could not parse Json Path expression: {}, reason: {}", exp, e.getMessage());
+            logger.warn("Could not parse REGEXP expression: {}, reason: {}", exp, e.getMessage());
         }
     }
 
     @Override
-    public String filter(String jsonString) {
-        try {
-            Object o = JsonPath.parse(jsonString).read(this.expression, Object.class);
-            return o == null ? "" : gson.toJson(o);
-        } catch (Exception e) {
+    public String filter(String data) {
+        if (regexp == null) {
+            return data;
+        }
+        Matcher matcher = regexp.matcher(data);
+        boolean match = matcher.find();
+        if (match) {
+            return data;
+        } else {
             return "";
         }
-
     }
+
 }

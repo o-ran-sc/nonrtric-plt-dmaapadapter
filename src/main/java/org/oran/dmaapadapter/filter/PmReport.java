@@ -18,7 +18,7 @@
  * ========================LICENSE_END===================================
  */
 
-package org.oran.dmaapadapter.repository.filters;
+package org.oran.dmaapadapter.filter;
 
 import java.util.ArrayList;
 import java.util.Collection;
