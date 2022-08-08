@@ -109,7 +109,24 @@ class PmReportFilterTest {
         filterData.measuredEntityDns.add("ManagedElement=RNC-Gbg-1");
         filter = new PmReportFilter(filterData);
         filtered = filter.filter(loadReport());
-        assertThat(filtered).contains("RNC-Gbg-1"); // '=' is escaped to unicode by gson. OK
+        assertThat(filtered).contains("ManagedElement=RNC-Gbg-1");
+    }
+
+    @Test
+    void testCrapInput() {
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        PmReportFilter filter = new PmReportFilter(filterData);
+
+        String filtered = filter.filter("junk");
+        assertThat(filtered).isEmpty();
+
+        filtered = filter.filter(reQuote("{'msg': 'test'}"));
+        assertThat(filtered).isEmpty();
+
+    }
+
+    private String reQuote(String str) {
+        return str.replaceAll("'", "\\\"");
     }
 
     @Test

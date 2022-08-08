@@ -20,30 +20,57 @@
 
 package org.oran.dmaapadapter.filter;
 
+import com.google.gson.annotations.Expose;
+
 import java.util.ArrayList;
 import java.util.Collection;
 
 public class PmReport {
 
+    @Expose
     Event event = new Event();
 
     public static class CommonEventHeader {
+        @Expose
         String domain;
+
+        @Expose
         String eventId;
+
+        @Expose
         int sequence;
+
+        @Expose
         String eventName;
+
+        @Expose
         String sourceName;
+
+        @Expose
         String reportingEntityName;
+
+        @Expose
         String priority;
+
+        @Expose
         long startEpochMicrosec;
+
+        @Expose
         long lastEpochMicrosec;
+
+        @Expose
         String version;
+
+        @Expose
         String vesEventListenerVersion;
+
+        @Expose
         String timeZoneOffset;
     }
 
     public static class MeasInfoId {
-        String sMeasInfoId;
+        @Expose
+        String sMeasInfoId = "";
     }
 
     public static class MeasTypes {
@@ -54,17 +81,26 @@ public class PmReport {
             return sMeasTypesList.get(pValue - 1);
         }
 
+        @Expose
         protected ArrayList<String> sMeasTypesList = new ArrayList<>();
     }
 
     public static class MeasResult {
+        @Expose
         int p;
-        String sValue;
+
+        @Expose
+        String sValue = "";
     }
 
     public static class MeasValuesList {
+        @Expose
         String measObjInstId;
+
+        @Expose
         String suspectFlag;
+
+        @Expose
         Collection<MeasResult> measResults = new ArrayList<>();
 
         public MeasValuesList shallowClone() {
@@ -76,8 +112,13 @@ public class PmReport {
     }
 
     public static class MeasInfoList {
+        @Expose
         MeasInfoId measInfoId;
+
+        @Expose
         MeasTypes measTypes;
+
+        @Expose
         Collection<MeasValuesList> measValuesList = new ArrayList<>();
 
         public MeasInfoList shallowClone() {
@@ -89,20 +130,35 @@ public class PmReport {
     }
 
     public static class MeasDataCollection {
+        @Expose
         int granularityPeriod;
+
+        @Expose
         String measuredEntityUserName;
+
+        @Expose
         String measuredEntityDn;
+
+        @Expose
         String measuredEntitySoftwareVersion;
+
+        @Expose
         Collection<MeasInfoList> measInfoList = new ArrayList<>();
     }
 
     public static class Perf3gppFields {
+        @Expose
         String perf3gppFieldsVersion;
+
+        @Expose
         MeasDataCollection measDataCollection;
     }
 
     public static class Event {
+        @Expose
         CommonEventHeader commonEventHeader;
+
+        @Expose
         Perf3gppFields perf3gppFields;
     }
 
