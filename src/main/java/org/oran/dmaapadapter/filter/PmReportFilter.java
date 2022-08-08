@@ -20,6 +20,7 @@
 
 package org.oran.dmaapadapter.filter;
 
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,11 +29,24 @@ import java.util.Map;
 
 import lombok.Getter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.thymeleaf.util.StringUtils;
 
 public class PmReportFilter implements Filter {
+    private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-    private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
+    private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder() //
+            .disableHtmlEscaping() //
+            .excludeFieldsWithoutExposeAnnotation() //
+            .create();
+
+    // excludeFieldsWithoutExposeAnnotation is not needed when parsing and this is a
+    // bit quicker
+    private static com.google.gson.Gson gsonParse = new com.google.gson.GsonBuilder() //
+            .disableHtmlEscaping() //
+            .create();
+
     private final FilterData filterData;
 
     @Getter
@@ -45,6 +59,7 @@ public class PmReportFilter implements Filter {
     }
 
     private static class MeasTypesIndexed extends PmReport.MeasTypes {
+
         private Map<String, Integer> map = new HashMap<>();
 
         public int addP(String measTypeName) {
@@ -52,9 +67,9 @@ public class PmReportFilter implements Filter {
             if (p != null) {
                 return p;
             } else {
-                this.sMeasTypesList.add(measTypeName);
-                this.map.put(measTypeName, this.sMeasTypesList.size());
-                return this.sMeasTypesList.size();
+                sMeasTypesList.add(measTypeName);
+                this.map.put(measTypeName, sMeasTypesList.size());
+                return sMeasTypesList.size();
             }
         }
     }
@@ -65,11 +80,21 @@ public class PmReportFilter implements Filter {
 
     @Override
     public String filter(String data) {
-        PmReport report = gson.fromJson(data, PmReport.class);
-        if (!filter(report, this.filterData)) {
+        try {
+            PmReport report = gsonParse.fromJson(data, PmReport.class);
+            if (report.event.perf3gppFields == null) {
+                logger.warn("Received PM report with no perf3gppFields, ignored. {}", data);
+                return "";
+            }
+
+            if (!filter(report, this.filterData)) {
+                return "";
+            }
+            return gson.toJson(report);
+        } catch (Exception e) {
+            logger.warn("Could not parse PM data. {}, reason: {}", data, e.getMessage());
             return "";
         }
-        return gson.toJson(report);
     }
 
     /**
