@@ -22,6 +22,7 @@ package org.oran.dmaapadapter.filter;
 
 import com.jayway.jsonpath.JsonPath;
 
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,12 +41,12 @@ class JsonPathFilter implements Filter {
     }
 
     @Override
-    public String filter(String jsonString) {
+    public FilteredData filter(DataFromTopic data) {
         try {
-            Object o = JsonPath.parse(jsonString).read(this.expression, Object.class);
-            return o == null ? "" : gson.toJson(o);
+            Object o = JsonPath.parse(data.value).read(this.expression, Object.class);
+            return o == null ? FilteredData.empty() : new FilteredData(data.key, gson.toJson(o));
         } catch (Exception e) {
-            return "";
+            return FilteredData.empty();
         }
 
     }

@@ -67,9 +67,10 @@ public class KafkaTopicListener implements TopicListener {
                         input.value())) //
                 .doOnError(t -> logger.error("KafkaTopicReceiver error: {}", t.getMessage())) //
                 .doFinally(sig -> logger.error("KafkaTopicReceiver stopped, reason: {}", sig)) //
+                .filter(t -> !t.value().isEmpty() || !t.key().isEmpty()) //
+                .map(input -> new DataFromTopic(input.key(), input.value())) //
                 .publish() //
-                .autoConnect() //
-                .map(input -> new DataFromTopic(input.key(), input.value())); //
+                .autoConnect();
     }
 
     private ReceiverOptions<String, String> kafkaInputProperties() {
