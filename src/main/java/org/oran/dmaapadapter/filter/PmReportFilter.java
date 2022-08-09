@@ -29,6 +29,7 @@ import java.util.Map;
 
 import lombok.Getter;
 
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.thymeleaf.util.StringUtils;
@@ -79,21 +80,31 @@ public class PmReportFilter implements Filter {
     }
 
     @Override
-    public String filter(String data) {
+    public FilteredData filter(DataFromTopic data) {
         try {
-            PmReport report = gsonParse.fromJson(data, PmReport.class);
+            PmReport report = createPmReport(data);
             if (report.event.perf3gppFields == null) {
                 logger.warn("Received PM report with no perf3gppFields, ignored. {}", data);
-                return "";
+                return FilteredData.empty();
             }
 
             if (!filter(report, this.filterData)) {
-                return "";
+                return FilteredData.empty();
             }
-            return gson.toJson(report);
+            return new FilteredData(data.key, gson.toJson(report));
         } catch (Exception e) {
             logger.warn("Could not parse PM data. {}, reason: {}", data, e.getMessage());
-            return "";
+            return FilteredData.empty();
+        }
+    }
+
+    @SuppressWarnings("java:S2445") // "data" is a method parameter, and should not be used for synchronization.
+    private PmReport createPmReport(DataFromTopic data) {
+        synchronized (data) {
+            if (data.getCachedPmReport() == null) {
+                data.setCachedPmReport(gsonParse.fromJson(data.value, PmReport.class));
+            }
+            return data.getCachedPmReport();
         }
     }
 

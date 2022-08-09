@@ -27,8 +27,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 
 class JsltFilterTest {
+
+    private String filterReport(JsltFilter filter) throws Exception {
+        return filter.filter(new DataFromTopic("", loadReport())).value;
+    }
 
     @Test
     void testPickOneValue() throws Exception {
@@ -36,7 +41,7 @@ class JsltFilterTest {
                 + ".event.perf3gppFields.measDataCollection.measInfoList[0].measValuesList[0].measResults[0].sValue";
 
         JsltFilter filter = new JsltFilter(reQuote(expresssion));
-        String res = filter.filter(loadReport());
+        String res = filterReport(filter);
         assertThat(res).isEqualTo(reQuote("'813'"));
     }
 
@@ -46,7 +51,7 @@ class JsltFilterTest {
                 + ".";
 
         JsltFilter filter = new JsltFilter(reQuote(expresssion));
-        String res = filter.filter(loadReport());
+        String res = filterReport(filter);
         assertThat(res).contains("event");
     }
 
@@ -55,7 +60,7 @@ class JsltFilterTest {
         String expresssion = "if(.event.commonEventHeader.sourceName == 'JUNK')" //
                 + ".";
         JsltFilter filter = new JsltFilter(reQuote(expresssion));
-        String res = filter.filter(loadReport());
+        String res = filterReport(filter);
         assertThat(res).isEmpty();
     }
 
@@ -71,7 +76,7 @@ class JsltFilterTest {
                         "}"; //
 
         JsltFilter filter = new JsltFilter(reQuote(expresssion));
-        String res = filter.filter(loadReport());
+        String res = filterReport(filter);
         String expected =
                 "{'array':['RncFunction=RF-1,UtranCell=Gbg-997','RncFunction=RF-1,UtranCell=Gbg-998','RncFunction=RF-1,UtranCell=Gbg-999'],'size':3}";
 

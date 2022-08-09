@@ -21,8 +21,8 @@
 package org.oran.dmaapadapter.tasks;
 
 import lombok.Getter;
-import lombok.ToString;
 
+import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,17 +43,6 @@ public abstract class JobDataDistributor {
     private final Job job;
     private Disposable subscription;
     private final ErrorStats errorStats = new ErrorStats();
-
-    @ToString
-    public static class DataToConsumer {
-        public final String key;
-        public final String value;
-
-        public DataToConsumer(String key, String value) {
-            this.key = key;
-            this.value = value;
-        }
-    }
 
     private class ErrorStats {
         private int consumerFaultCounter = 0;
@@ -88,7 +77,7 @@ public abstract class JobDataDistributor {
     public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
         stop();
         this.errorStats.resetIrrecoverableErrors();
-        this.subscription = handleReceivedMessage(input, job) //
+        this.subscription = filterAndBuffer(input, job) //
                 .flatMap(this::sendToClient, job.getParameters().getMaxConcurrency()) //
                 .onErrorResume(this::handleError) //
                 .subscribe(this::handleSentOk, //
@@ -101,7 +90,7 @@ public abstract class JobDataDistributor {
         stop();
     }
 
-    protected abstract Mono<String> sendToClient(DataToConsumer output);
+    protected abstract Mono<String> sendToClient(Filter.FilteredData output);
 
     public synchronized void stop() {
         if (this.subscription != null) {
@@ -114,18 +103,17 @@ public abstract class JobDataDistributor {
         return this.subscription != null;
     }
 
-    private Flux<DataToConsumer> handleReceivedMessage(Flux<TopicListener.DataFromTopic> inputFlux, Job job) {
-        Flux<DataToConsumer> result = inputFlux.map(input -> new DataToConsumer(input.key, job.filter(input.value))) //
-                .filter(t -> !t.value.isEmpty()); //
+    private Flux<Filter.FilteredData> filterAndBuffer(Flux<TopicListener.DataFromTopic> inputFlux, Job job) {
+        Flux<Filter.FilteredData> filtered = inputFlux.map(job::filter); //
 
         if (job.isBuffered()) {
-            result = result.map(input -> quoteNonJson(input.value, job)) //
+            filtered = filtered.map(input -> quoteNonJson(input.value, job)) //
                     .bufferTimeout( //
                             job.getParameters().getBufferTimeout().getMaxSize(), //
                             job.getParameters().getBufferTimeout().getMaxTime()) //
-                    .map(buffered -> new DataToConsumer("", buffered.toString()));
+                    .map(buffered -> new Filter.FilteredData("", buffered.toString()));
         }
-        return result;
+        return filtered;
     }
 
     private String quoteNonJson(String str, Job job) {

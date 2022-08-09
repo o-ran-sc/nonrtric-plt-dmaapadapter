@@ -407,7 +407,6 @@ class ApplicationTest {
 
         PmReportArray reportsParsed = gson.fromJson(receivedFiltered, PmReportArray.class);
         assertThat(reportsParsed).hasSize(1);
-
     }
 
     @Test

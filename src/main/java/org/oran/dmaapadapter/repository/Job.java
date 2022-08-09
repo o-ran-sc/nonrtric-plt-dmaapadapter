@@ -30,6 +30,7 @@ import lombok.ToString;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.FilterFactory;
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,10 +143,10 @@ public class Job {
         this.consumerRestClient = consumerRestClient;
     }
 
-    public String filter(String data) {
+    public Filter.FilteredData filter(DataFromTopic data) {
         if (filter == null) {
             logger.debug("No filter used");
-            return data;
+            return new Filter.FilteredData(data.key, data.value);
         }
         return filter.filter(data);
     }

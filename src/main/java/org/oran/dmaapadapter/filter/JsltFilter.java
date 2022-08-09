@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.node.NullNode;
 import com.schibsted.spt.data.jslt.Expression;
 import com.schibsted.spt.data.jslt.Parser;
 
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,22 +47,22 @@ class JsltFilter implements Filter {
     }
 
     @Override
-    public String filter(String jsonString) {
+    public FilteredData filter(DataFromTopic data) {
         if (expression == null) {
-            return jsonString;
+            return new FilteredData(data.key, data.value);
         }
         try {
             JsonFactory factory = mapper.getFactory();
-            JsonParser parser = factory.createParser(jsonString);
+            JsonParser parser = factory.createParser(data.value);
             JsonNode actualObj = mapper.readTree(parser);
 
             JsonNode filteredNode = expression.apply(actualObj);
             if (filteredNode == NullNode.instance) {
-                return "";
+                return FilteredData.empty();
             }
-            return mapper.writeValueAsString(filteredNode);
+            return new FilteredData(data.key, mapper.writeValueAsString(filteredNode));
         } catch (Exception e) {
-            return "";
+            return FilteredData.empty();
         }
     }
 

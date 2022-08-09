@@ -20,7 +20,11 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
+
+import org.oran.dmaapadapter.filter.PmReport;
 import reactor.core.publisher.Flux;
 
 public interface TopicListener {
@@ -29,6 +33,10 @@ public interface TopicListener {
     public static class DataFromTopic {
         public final String key;
         public final String value;
+
+        @Getter
+        @Setter
+        private PmReport cachedPmReport;
 
         public DataFromTopic(String key, String value) {
             this.key = key;

@@ -20,12 +20,31 @@
 
 package org.oran.dmaapadapter.filter;
 
+import lombok.ToString;
+
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
+
 public interface Filter {
 
     public enum Type {
         REGEXP, JSLT, JSON_PATH, PM_DATA, NONE
     }
 
-    public String filter(String data);
+    @ToString
+    public static class FilteredData {
+        public final String key;
+        public final String value;
+
+        public FilteredData(String key, String value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public static FilteredData empty() {
+            return new FilteredData("", "");
+        }
+    }
+
+    public FilteredData filter(DataFromTopic data);
 
 }

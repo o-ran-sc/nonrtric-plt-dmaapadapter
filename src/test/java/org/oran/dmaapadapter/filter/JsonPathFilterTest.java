@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 
 class JsonPathFilterTest {
 
@@ -34,7 +35,7 @@ class JsonPathFilterTest {
     void testJsonPath() throws Exception {
         String exp = ("$.event.perf3gppFields.measDataCollection.measInfoList[0].measTypes.sMeasTypesList[0]");
         JsonPathFilter filter = new JsonPathFilter(exp);
-        String res = filter.filter(loadReport());
+        String res = filter.filter(new DataFromTopic("", loadReport())).value;
         assertThat(res).isEqualTo("\"attTCHSeizures\"");
     }
 
