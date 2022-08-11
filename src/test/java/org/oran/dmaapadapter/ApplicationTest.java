@@ -267,6 +267,13 @@ class ApplicationTest {
     }
 
     @Test
+    void testTrustValidation() throws IOException {
+        String url = "https://localhost:" + applicationConfig.getLocalServerHttpPort() + "/v3/api-docs";
+        ResponseEntity<String> resp = restClient(true).getForEntity(url).block();
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
     void testResponseCodes() throws Exception {
         String supervisionUrl = baseUrl() + ProducerCallbacksController.SUPERVISION_URL;
         ResponseEntity<String> resp = restClient().getForEntity(supervisionUrl).block();
