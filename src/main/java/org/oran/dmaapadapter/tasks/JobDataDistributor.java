@@ -104,7 +104,8 @@ public abstract class JobDataDistributor {
     }
 
     private Flux<Filter.FilteredData> filterAndBuffer(Flux<TopicListener.DataFromTopic> inputFlux, Job job) {
-        Flux<Filter.FilteredData> filtered = inputFlux.map(job::filter); //
+        Flux<Filter.FilteredData> filtered = inputFlux.map(job::filter) //
+                .filter(f -> !f.isEmpty());
 
         if (job.isBuffered()) {
             filtered = filtered.map(input -> quoteNonJson(input.value, job)) //

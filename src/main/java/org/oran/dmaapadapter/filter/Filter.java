@@ -35,6 +35,10 @@ public interface Filter {
         public final String key;
         public final String value;
 
+        public boolean isEmpty() {
+            return value.isEmpty() && key.isEmpty();
+        }
+
         public FilteredData(String key, String value) {
             this.key = key;
             this.value = value;

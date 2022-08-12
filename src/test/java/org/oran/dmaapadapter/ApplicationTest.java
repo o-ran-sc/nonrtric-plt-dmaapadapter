@@ -268,6 +268,7 @@ class ApplicationTest {
 
     @Test
     void testTrustValidation() throws IOException {
+
         String url = "https://localhost:" + applicationConfig.getLocalServerHttpPort() + "/v3/api-docs";
         ResponseEntity<String> resp = restClient(true).getForEntity(url).block();
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -404,6 +405,8 @@ class ApplicationTest {
         // filtered PM message
         String path = "./src/test/resources/pm_report.json";
         String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
+        DmaapSimulatorController.addPmResponse("{}"); // This should just be discarded
+
         DmaapSimulatorController.addPmResponse(pmReportJson);
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
