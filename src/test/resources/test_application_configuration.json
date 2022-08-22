@@ -20,7 +20,7 @@
       },
       {
          "id": "PmInformationTypeKafka",
-         "kafkaInputTopic": "KafkaPmInput",
+         "kafkaInputTopic": "PmFileData",
          "useHttpProxy": false,
          "dataType": "PmData",
          "isJson": true

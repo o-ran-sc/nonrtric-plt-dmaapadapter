@@ -34,6 +34,7 @@ public interface Filter {
     public static class FilteredData {
         public final String key;
         public final String value;
+        private static final FilteredData emptyData = new FilteredData("", "");
 
         public boolean isEmpty() {
             return value.isEmpty() && key.isEmpty();
@@ -45,10 +46,9 @@ public interface Filter {
         }
 
         public static FilteredData empty() {
-            return new FilteredData("", "");
+            return emptyData;
         }
     }
 
     public FilteredData filter(DataFromTopic data);
-
 }

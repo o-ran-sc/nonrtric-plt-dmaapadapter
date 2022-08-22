@@ -96,6 +96,10 @@ public class ApplicationConfig {
     @Value("${app.kafka.bootstrap-servers:}")
     private String kafkaBootStrapServers;
 
+    @Getter
+    @Value("${app.pm-files-path:}")
+    private String pmFilesPath;
+
     private WebClientConfig webClientConfig = null;
 
     public WebClientConfig getWebClientConfig() {

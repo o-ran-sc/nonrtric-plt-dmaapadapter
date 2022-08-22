@@ -20,6 +20,7 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,9 +32,18 @@ import org.oran.dmaapadapter.repository.InfoType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import lombok.Builder;
+import lombok.Getter;
+import lombok.ToString;
 import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
+
+import java.nio.charset.Charset;
+import java.nio.file.Files;
 
 /**
  * The class streams incoming requests from a Kafka topic and sends them further
@@ -45,23 +55,36 @@ public class KafkaTopicListener implements TopicListener {
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
     private Flux<DataFromTopic> dataFromTopic;
+    private final String kafkaClientId;
 
-    public KafkaTopicListener(ApplicationConfig applicationConfig, InfoType type) {
+    private static Gson gson = new GsonBuilder() //
+            .disableHtmlEscaping() //
+            .create(); //
+
+    @ToString
+    @Builder
+    public static class NewFileEvent {
+        @Getter
+        private String filename;
+    }
+
+    public KafkaTopicListener(ApplicationConfig applicationConfig, InfoType type, String kafkaClientId) {
         this.applicationConfig = applicationConfig;
         this.type = type;
+        this.kafkaClientId = kafkaClientId;
     }
 
     @Override
     public Flux<DataFromTopic> getFlux() {
         if (this.dataFromTopic == null) {
-            this.dataFromTopic = startReceiveFromTopic();
+            this.dataFromTopic = startReceiveFromTopic(this.kafkaClientId);
         }
         return this.dataFromTopic;
     }
 
-    private Flux<DataFromTopic> startReceiveFromTopic() {
+    private Flux<DataFromTopic> startReceiveFromTopic(String clientId) {
         logger.debug("Listening to kafka topic: {} type :{}", this.type.getKafkaInputTopic(), type.getId());
-        return KafkaReceiver.create(kafkaInputProperties()) //
+        return KafkaReceiver.create(kafkaInputProperties(clientId)) //
                 .receive() //
                 .doOnNext(input -> logger.debug("Received from kafka topic: {} :{}", this.type.getKafkaInputTopic(),
                         input.value())) //
@@ -69,11 +92,30 @@ public class KafkaTopicListener implements TopicListener {
                 .doFinally(sig -> logger.error("KafkaTopicReceiver stopped, reason: {}", sig)) //
                 .filter(t -> !t.value().isEmpty() || !t.key().isEmpty()) //
                 .map(input -> new DataFromTopic(input.key(), input.value())) //
+                .map(this::getDataFromFileIfNewPmFileEvent) //
                 .publish() //
-                .autoConnect();
+                .autoConnect(1);
     }
 
-    private ReceiverOptions<String, String> kafkaInputProperties() {
+    private DataFromTopic getDataFromFileIfNewPmFileEvent(DataFromTopic data) {
+
+        if (!applicationConfig.getPmFilesPath().isEmpty()
+                && this.type.getDataType() == InfoType.DataType.PM_DATA
+                && data.value.length() < 1000) {
+            try {
+                NewFileEvent ev = gson.fromJson(data.value, NewFileEvent.class);
+                Path path = Path.of(this.applicationConfig.getPmFilesPath(), ev.getFilename());
+                String pmReportJson = Files.readString(path, Charset.defaultCharset());
+                return new DataFromTopic(data.key, pmReportJson);
+            } catch (Exception e) {
+                return data;
+            }
+        } else {
+            return data;
+        }
+    }
+
+    private ReceiverOptions<String, String> kafkaInputProperties(String clientId) {
         Map<String, Object> consumerProps = new HashMap<>();
         if (this.applicationConfig.getKafkaBootStrapServers().isEmpty()) {
             logger.error("No kafka boostrap server is setup");
@@ -83,7 +125,7 @@ public class KafkaTopicListener implements TopicListener {
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
-        consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, this.applicationConfig.getSelfUrl());
+        consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId);
 
         return ReceiverOptions.<String, String>create(consumerProps)
                 .subscription(Collections.singleton(this.type.getKafkaInputTopic()));

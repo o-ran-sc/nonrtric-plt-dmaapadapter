@@ -16,11 +16,13 @@ springdoc:
 logging:
   # Configuration of logging
   level:
-    ROOT: ERROR
+    ROOT: WARN
+    org.apache.kafka: WARN
     org.springframework: ERROR
     org.springframework.data: ERROR
     org.springframework.web.reactive.function.client.ExchangeFunctions: ERROR
     org.oran.dmaapadapter: INFO
+
   file:
     name: /var/log/dmaap-adapter-service/application.log
 server:
@@ -59,3 +61,4 @@ app:
     bootstrap-servers: localhost:9092
   # If the file name is empty, no authorization token is used
   auth-token-file:
+  pm-files-path: /tmp

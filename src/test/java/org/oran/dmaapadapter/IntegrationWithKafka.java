@@ -79,8 +79,8 @@ import reactor.kafka.sender.SenderRecord;
 @TestPropertySource(properties = { //
         "server.ssl.key-store=./config/keystore.jks", //
         "app.webclient.trust-store=./config/truststore.jks", //
-        "app.configuration-filepath=./src/test/resources/test_application_configuration.json"//
-})
+        "app.configuration-filepath=./src/test/resources/test_application_configuration.json", //
+        "app.pm-files-path=./src/test/resources/" }) //
 class IntegrationWithKafka {
 
     final String TYPE_ID = "KafkaInformationType";
@@ -168,8 +168,10 @@ class IntegrationWithKafka {
 
             // Create a listener to the output topic. The KafkaTopicListener happens to be
             // suitable for that,
-            InfoType type = new InfoType("id", null, false, OUTPUT_TOPIC, "dataType", false);
-            KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type);
+            InfoType type = InfoType.builder().id("id").kafkaInputTopic(OUTPUT_TOPIC).dataType("dataType").build();
+
+            KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type,
+                    "TestClientId" + "_" + outputTopic);
 
             topicListener.getFlux() //
                     .doOnNext(this::set) //
@@ -306,7 +308,7 @@ class IntegrationWithKafka {
 
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ProducerConfig.CLIENT_ID_CONFIG, "sample-producerx");
+        // props.put(ProducerConfig.CLIENT_ID_CONFIG, "sample-producerx");
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -473,10 +475,14 @@ class IntegrationWithKafka {
 
         Instant startTime = Instant.now();
 
+        KafkaTopicListener.NewFileEvent event = KafkaTopicListener.NewFileEvent.builder().filename("pm_report.json")
+                .build();
+        String eventAsString = gson.toJson(event);
+
         String path = "./src/test/resources/pm_report.json";
         String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
 
-        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> senderRecord(pmReportJson, "", PM_TYPE_ID));
+        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> senderRecord(eventAsString, "key", PM_TYPE_ID));
         sendDataToStream(dataToSend);
 
         while (kafkaReceiver.count != NO_OF_OBJECTS) {
