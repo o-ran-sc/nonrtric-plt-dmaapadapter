@@ -52,6 +52,15 @@
             "description": "Void/empty",
             "type": "object"
         },
+        "statistics_info": {
+            "description": "Statistics information",
+            "type": "object",
+            "properties": {"jobStatistics": {
+                "description": "Statistics per job",
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/Statistics"}
+            }}
+        },
         "producer_registration_info": {
             "description": "Information for an Information Producer",
             "type": "object",
@@ -78,6 +87,10 @@
                     "type": "string"
                 }
             }
+        },
+        "Statistics": {
+            "description": "Statistics per job",
+            "type": "object"
         },
         "Link": {
             "type": "object",
@@ -142,6 +155,15 @@
                 "required": true
             }],
             "tags": ["Information Coordinator Service Simulator (exists only in test)"]
+        }},
+        "/statistics": {"get": {
+            "summary": "Returns statistics",
+            "operationId": "getStatistics",
+            "responses": {"200": {
+                "description": "OK",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/statistics_info"}}}
+            }},
+            "tags": ["Producer job control API"]
         }},
         "/generic_dataproducer/health_check": {"get": {
             "summary": "Producer supervision",

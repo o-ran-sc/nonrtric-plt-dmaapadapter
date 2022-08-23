@@ -23,11 +23,13 @@ package org.oran.dmaapadapter.repository;
 import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
 import org.oran.dmaapadapter.clients.AsyncRestClient;
+import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.FilterFactory;
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
@@ -37,6 +39,40 @@ import org.slf4j.LoggerFactory;
 @ToString
 public class Job {
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+    @Builder
+    public static class Statistics {
+        String jobId;
+        String typeId;
+        String inputTopic;
+        String outputTopic;
+        String groupId;
+        String clientId;
+
+        @Builder.Default
+        int noOfReceivedObjects = 0;
+
+        @Builder.Default
+        int noOfReceivedBytes = 0;
+
+        @Builder.Default
+        int noOfSentObjects = 0;
+
+        @Builder.Default
+        int noOfSentBytes = 0;
+
+        public void received(String str) {
+            noOfReceivedBytes += str.length();
+            noOfReceivedObjects += 1;
+
+        }
+
+        public void filtered(String str) {
+            noOfSentBytes += str.length();
+            noOfSentObjects += 1;
+        }
+
+    }
 
     public static class Parameters {
         public static final String REGEXP_TYPE = "regexp";
@@ -128,10 +164,13 @@ public class Job {
     private final Filter filter;
 
     @Getter
+    private final Statistics statistics;
+
+    @Getter
     private final AsyncRestClient consumerRestClient;
 
     public Job(String id, String callbackUrl, InfoType type, String owner, String lastUpdated, Parameters parameters,
-            AsyncRestClient consumerRestClient) {
+            AsyncRestClient consumerRestClient, ApplicationConfig appConfig) {
         this.id = id;
         this.callbackUrl = callbackUrl;
         this.type = type;
@@ -141,6 +180,16 @@ public class Job {
         filter = parameters.filter == null ? null
                 : FilterFactory.create(parameters.getFilter(), parameters.getFilterType());
         this.consumerRestClient = consumerRestClient;
+
+        statistics = Statistics.builder() //
+                .groupId(type.getKafkaGroupId()) //
+                .inputTopic(type.getKafkaInputTopic()) //
+                .jobId(id) //
+                .outputTopic(parameters.getKafkaOutputTopic()) //
+                .typeId(type.getId()) //
+                .clientId(type.getKafkaClientId(appConfig)) //
+                .build();
+
     }
 
     public Filter.FilteredData filter(DataFromTopic data) {

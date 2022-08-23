@@ -55,9 +55,12 @@ public class Jobs {
     private MultiMap<Job> jobsByType = new MultiMap<>();
     private final AsyncRestClientFactory restclientFactory;
     private final List<Observer> observers = new ArrayList<>();
+    private final ApplicationConfig appConfig;
 
-    public Jobs(@Autowired ApplicationConfig applicationConfig, @Autowired SecurityContext securityContext) {
+    public Jobs(@Autowired ApplicationConfig applicationConfig, @Autowired SecurityContext securityContext,
+            @Autowired ApplicationConfig appConfig) {
         restclientFactory = new AsyncRestClientFactory(applicationConfig.getWebClientConfig(), securityContext);
+        this.appConfig = appConfig;
     }
 
     public synchronized Job getJob(String id) throws ServiceException {
@@ -81,7 +84,7 @@ public class Jobs {
         AsyncRestClient consumerRestClient = type.isUseHttpProxy() //
                 ? restclientFactory.createRestClientUseHttpProxy(callbackUrl) //
                 : restclientFactory.createRestClientNoHttpProxy(callbackUrl);
-        Job job = new Job(id, callbackUrl, type, owner, lastUpdated, parameters, consumerRestClient);
+        Job job = new Job(id, callbackUrl, type, owner, lastUpdated, parameters, consumerRestClient, this.appConfig);
         this.put(job);
         synchronized (observers) {
             this.observers.forEach(obs -> obs.onJobbAdded(job));

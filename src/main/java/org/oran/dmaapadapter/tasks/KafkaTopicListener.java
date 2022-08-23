@@ -20,10 +20,19 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+
+import lombok.Builder;
+import lombok.Getter;
+import lombok.ToString;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -32,18 +41,9 @@ import org.oran.dmaapadapter.repository.InfoType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import lombok.Builder;
-import lombok.Getter;
-import lombok.ToString;
 import reactor.core.publisher.Flux;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
-
-import java.nio.charset.Charset;
-import java.nio.file.Files;
 
 /**
  * The class streams incoming requests from a Kafka topic and sends them further
@@ -55,7 +55,6 @@ public class KafkaTopicListener implements TopicListener {
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
     private Flux<DataFromTopic> dataFromTopic;
-    private final String kafkaClientId;
 
     private static Gson gson = new GsonBuilder() //
             .disableHtmlEscaping() //
@@ -68,24 +67,25 @@ public class KafkaTopicListener implements TopicListener {
         private String filename;
     }
 
-    public KafkaTopicListener(ApplicationConfig applicationConfig, InfoType type, String kafkaClientId) {
+    public KafkaTopicListener(ApplicationConfig applicationConfig, InfoType type) {
         this.applicationConfig = applicationConfig;
         this.type = type;
-        this.kafkaClientId = kafkaClientId;
     }
 
     @Override
     public Flux<DataFromTopic> getFlux() {
         if (this.dataFromTopic == null) {
-            this.dataFromTopic = startReceiveFromTopic(this.kafkaClientId);
+            this.dataFromTopic = startReceiveFromTopic(this.type.getKafkaClientId(this.applicationConfig));
         }
         return this.dataFromTopic;
     }
 
     private Flux<DataFromTopic> startReceiveFromTopic(String clientId) {
         logger.debug("Listening to kafka topic: {} type :{}", this.type.getKafkaInputTopic(), type.getId());
+
         return KafkaReceiver.create(kafkaInputProperties(clientId)) //
-                .receive() //
+                .receiveAutoAck() //
+                .concatMap(consumerRecord -> consumerRecord) //
                 .doOnNext(input -> logger.debug("Received from kafka topic: {} :{}", this.type.getKafkaInputTopic(),
                         input.value())) //
                 .doOnError(t -> logger.error("KafkaTopicReceiver error: {}", t.getMessage())) //
@@ -99,8 +99,8 @@ public class KafkaTopicListener implements TopicListener {
 
     private DataFromTopic getDataFromFileIfNewPmFileEvent(DataFromTopic data) {
 
-        if (!applicationConfig.getPmFilesPath().isEmpty()
-                && this.type.getDataType() == InfoType.DataType.PM_DATA
+        if (!applicationConfig.getPmFilesPath().isEmpty() //
+                && this.type.getDataType() == InfoType.DataType.PM_DATA //
                 && data.value.length() < 1000) {
             try {
                 NewFileEvent ev = gson.fromJson(data.value, NewFileEvent.class);
@@ -121,7 +121,7 @@ public class KafkaTopicListener implements TopicListener {
             logger.error("No kafka boostrap server is setup");
         }
         consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, this.applicationConfig.getKafkaBootStrapServers());
-        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "osc-dmaap-adapter-" + this.type.getId());
+        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, this.type.getKafkaGroupId());
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);

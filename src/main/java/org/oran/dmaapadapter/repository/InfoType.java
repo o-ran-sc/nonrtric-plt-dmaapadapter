@@ -24,6 +24,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 
+import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.springframework.util.StringUtils;
 
 @ToString
@@ -70,5 +71,14 @@ public class InfoType {
             return DataType.PM_DATA;
         }
         return DataType.OTHER;
+    }
+
+    public String getKafkaGroupId() {
+        return this.kafkaInputTopic == null ? null : "osc-dmaap-adapter-" + getId();
+    }
+
+    public String getKafkaClientId(ApplicationConfig appConfig) {
+        return this.kafkaInputTopic == null ? null : getId() + "_" + appConfig.getSelfUrl();
+
     }
 }
