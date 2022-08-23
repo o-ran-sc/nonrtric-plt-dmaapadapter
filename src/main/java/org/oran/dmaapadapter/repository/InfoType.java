@@ -71,4 +71,8 @@ public class InfoType {
         }
         return DataType.OTHER;
     }
+
+    public String getKafkaGroupId() {
+        return this.kafkaInputTopic == null ? null : "osc-dmaap-adapter-" + getId();
+    }
 }

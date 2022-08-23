@@ -77,7 +77,7 @@ public abstract class JobDataDistributor {
     public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
         stop();
         this.errorStats.resetIrrecoverableErrors();
-        this.subscription = filterAndBuffer(input, job) //
+        this.subscription = filterAndBuffer(input, this.job) //
                 .flatMap(this::sendToClient, job.getParameters().getMaxConcurrency()) //
                 .onErrorResume(this::handleError) //
                 .subscribe(this::handleSentOk, //
@@ -104,8 +104,11 @@ public abstract class JobDataDistributor {
     }
 
     private Flux<Filter.FilteredData> filterAndBuffer(Flux<TopicListener.DataFromTopic> inputFlux, Job job) {
-        Flux<Filter.FilteredData> filtered = inputFlux.map(job::filter) //
-                .filter(f -> !f.isEmpty());
+        Flux<Filter.FilteredData> filtered = //
+                inputFlux.doOnNext(data -> job.getStatistics().received(data.value)) //
+                        .map(job::filter) //
+                        .filter(f -> !f.isEmpty()) //
+                        .doOnNext(f -> job.getStatistics().filtered(f.value)); //
 
         if (job.isBuffered()) {
             filtered = filtered.map(input -> quoteNonJson(input.value, job)) //
