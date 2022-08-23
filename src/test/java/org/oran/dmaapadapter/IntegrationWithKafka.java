@@ -47,6 +47,7 @@ import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
+import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.r1.ConsumerJobInfo;
@@ -80,7 +81,7 @@ import reactor.kafka.sender.SenderRecord;
         "server.ssl.key-store=./config/keystore.jks", //
         "app.webclient.trust-store=./config/truststore.jks", //
         "app.configuration-filepath=./src/test/resources/test_application_configuration.json", //
-        "app.pm-files-path=./src/test/resources/" }) //
+        "app.pm-files-path=./src/test/resources/"}) //
 class IntegrationWithKafka {
 
     final String TYPE_ID = "KafkaInformationType";
@@ -168,10 +169,10 @@ class IntegrationWithKafka {
 
             // Create a listener to the output topic. The KafkaTopicListener happens to be
             // suitable for that,
-            InfoType type = InfoType.builder().id("id").kafkaInputTopic(OUTPUT_TOPIC).dataType("dataType").build();
+            InfoType type =
+                    InfoType.builder().id("TestReceiver").kafkaInputTopic(OUTPUT_TOPIC).dataType("dataType").build();
 
-            KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type,
-                    "TestClientId" + "_" + outputTopic);
+            KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type);
 
             topicListener.getFlux() //
                     .doOnNext(this::set) //
@@ -415,6 +416,14 @@ class IntegrationWithKafka {
 
         await().untilAsserted(() -> assertThat(kafkaReceiver.lastValue()).isEqualTo(sendString));
         assertThat(kafkaReceiver.lastKey()).isEqualTo(sendKey);
+
+        printStatistics();
+    }
+
+    private void printStatistics() {
+        String targetUri = baseUrl() + ProducerCallbacksController.STATISTICS_URL;
+        String stats = restClient().get(targetUri).block();
+        logger.info("Stats : {}", stats);
     }
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
@@ -475,8 +484,8 @@ class IntegrationWithKafka {
 
         Instant startTime = Instant.now();
 
-        KafkaTopicListener.NewFileEvent event = KafkaTopicListener.NewFileEvent.builder().filename("pm_report.json")
-                .build();
+        KafkaTopicListener.NewFileEvent event =
+                KafkaTopicListener.NewFileEvent.builder().filename("pm_report.json").build();
         String eventAsString = gson.toJson(event);
 
         String path = "./src/test/resources/pm_report.json";
@@ -495,6 +504,8 @@ class IntegrationWithKafka {
         final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
         logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
         logger.info("***  kafkaReceiver2 :" + kafkaReceiver.count);
+
+        printStatistics();
     }
 
     @Test
