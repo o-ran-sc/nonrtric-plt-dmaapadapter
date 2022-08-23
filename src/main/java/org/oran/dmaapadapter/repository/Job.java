@@ -20,14 +20,20 @@
 
 package org.oran.dmaapadapter.repository;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
 import org.oran.dmaapadapter.clients.AsyncRestClient;
+import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.FilterFactory;
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
@@ -37,6 +43,59 @@ import org.slf4j.LoggerFactory;
 @ToString
 public class Job {
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+    @Builder
+    @Schema(name = "job_statistics", description = "Statistics information for one job")
+    public static class Statistics {
+
+        // @Schema(name = "jobId", description = "jobId", required = true)
+        // @SerializedName("jobId")
+        @JsonProperty(value = "jobId", required = true)
+        String jobId;
+
+        @JsonProperty(value = "typeId", required = true)
+        String typeId;
+
+        @JsonProperty(value = "inputTopic", required = true)
+        String inputTopic;
+
+        @JsonProperty(value = "outputTopic", required = true)
+        String outputTopic;
+
+        @JsonProperty(value = "groupId", required = true)
+        String groupId;
+
+        @JsonProperty(value = "clientId", required = true)
+        String clientId;
+
+        @JsonProperty(value = "noOfReceivedObjects", required = true)
+        @Builder.Default
+        int noOfReceivedObjects = 0;
+
+        @JsonProperty(value = "noOfReceivedBytes", required = true)
+        @Builder.Default
+        int noOfReceivedBytes = 0;
+
+        @JsonProperty(value = "noOfSentObjects", required = true)
+        @Builder.Default
+        int noOfSentObjects = 0;
+
+        @JsonProperty(value = "noOfSentBytes", required = true)
+        @Builder.Default
+        int noOfSentBytes = 0;
+
+        public void received(String str) {
+            noOfReceivedBytes += str.length();
+            noOfReceivedObjects += 1;
+
+        }
+
+        public void filtered(String str) {
+            noOfSentBytes += str.length();
+            noOfSentObjects += 1;
+        }
+
+    }
 
     public static class Parameters {
         public static final String REGEXP_TYPE = "regexp";
@@ -128,10 +187,13 @@ public class Job {
     private final Filter filter;
 
     @Getter
+    private final Statistics statistics;
+
+    @Getter
     private final AsyncRestClient consumerRestClient;
 
     public Job(String id, String callbackUrl, InfoType type, String owner, String lastUpdated, Parameters parameters,
-            AsyncRestClient consumerRestClient) {
+            AsyncRestClient consumerRestClient, ApplicationConfig appConfig) {
         this.id = id;
         this.callbackUrl = callbackUrl;
         this.type = type;
@@ -141,6 +203,16 @@ public class Job {
         filter = parameters.filter == null ? null
                 : FilterFactory.create(parameters.getFilter(), parameters.getFilterType());
         this.consumerRestClient = consumerRestClient;
+
+        statistics = Statistics.builder() //
+                .groupId(type.getKafkaGroupId()) //
+                .inputTopic(type.getKafkaInputTopic()) //
+                .jobId(id) //
+                .outputTopic(parameters.getKafkaOutputTopic()) //
+                .typeId(type.getId()) //
+                .clientId(type.getKafkaClientId(appConfig)) //
+                .build();
+
     }
 
     public Filter.FilteredData filter(DataFromTopic data) {

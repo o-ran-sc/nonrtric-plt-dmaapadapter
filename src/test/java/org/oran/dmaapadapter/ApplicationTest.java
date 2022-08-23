@@ -47,6 +47,7 @@ import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
+import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.PmReport;
 import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.r1.ConsumerJobInfo;
@@ -552,6 +553,23 @@ class ApplicationTest {
         icsSimulatorController.testResults.types.clear();
         await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds)
                 .hasSize(this.types.size()));
+    }
+
+    @Test
+    void testStatistics() throws ServiceException {
+        // Register producer, Register types
+        waitForRegistration();
+        final String JOB_ID = "testStatistics";
+        ConsumerJobInfo jobInfo = consumerJobInfo("DmaapInformationType", JOB_ID, jsonObjectRegexp());
+
+        this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+
+        String targetUri = baseUrl() + ProducerCallbacksController.STATISTICS_URL;
+        String stats = restClient().get(targetUri).block();
+
+        assertThat(stats).contains(JOB_ID, "DmaapInformationType");
+
     }
 
     public static void testErrorCode(Mono<?> request, HttpStatus expStatus, String responseContains) {

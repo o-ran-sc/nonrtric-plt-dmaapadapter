@@ -52,6 +52,55 @@
             "description": "Void/empty",
             "type": "object"
         },
+        "job_statistics": {
+            "description": "Statistics information for one job",
+            "type": "object",
+            "required": [
+                "clientId",
+                "groupId",
+                "inputTopic",
+                "jobId",
+                "noOfReceivedBytes",
+                "noOfReceivedObjects",
+                "noOfSentBytes",
+                "noOfSentObjects",
+                "outputTopic",
+                "typeId"
+            ],
+            "properties": {
+                "noOfSentObjects": {
+                    "format": "int32",
+                    "type": "integer"
+                },
+                "jobId": {"type": "string"},
+                "outputTopic": {"type": "string"},
+                "noOfSentBytes": {
+                    "format": "int32",
+                    "type": "integer"
+                },
+                "clientId": {"type": "string"},
+                "groupId": {"type": "string"},
+                "noOfReceivedBytes": {
+                    "format": "int32",
+                    "type": "integer"
+                },
+                "typeId": {"type": "string"},
+                "inputTopic": {"type": "string"},
+                "noOfReceivedObjects": {
+                    "format": "int32",
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics_info": {
+            "description": "Statistics information",
+            "type": "object",
+            "properties": {"jobStatistics": {
+                "description": "Statistics per job",
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/job_statistics"}
+            }}
+        },
         "producer_registration_info": {
             "description": "Information for an Information Producer",
             "type": "object",
@@ -142,6 +191,15 @@
                 "required": true
             }],
             "tags": ["Information Coordinator Service Simulator (exists only in test)"]
+        }},
+        "/statistics": {"get": {
+            "summary": "Returns statistics",
+            "operationId": "getStatistics",
+            "responses": {"200": {
+                "description": "OK",
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/statistics_info"}}}
+            }},
+            "tags": ["Producer job control API"]
         }},
         "/generic_dataproducer/health_check": {"get": {
             "summary": "Producer supervision",
