@@ -63,6 +63,23 @@
       "message": "i think this overwrote the staging 1.1.0 release  :-( ",
       "revId": "49bd43f74364584939fd930439db02cc75c161dc",
       "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6add82f7_1222a0aa",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000103
+      },
+      "writtenOn": "2022-08-25T16:17:07Z",
+      "side": 1,
+      "message": "Attempt to repair in https://gerrit.o-ran-sc.org/r/c/nonrtric/plt/dmaapadapter/+/8949 and https://gerrit.o-ran-sc.org/r/c/nonrtric/plt/dmaapadapter/+/8540 ",
+      "revId": "49bd43f74364584939fd930439db02cc75c161dc",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
     }
   ]
 }
