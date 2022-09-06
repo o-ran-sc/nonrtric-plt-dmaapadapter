@@ -23,12 +23,14 @@ package org.oran.dmaapadapter.tasks;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -42,8 +44,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.async.AsyncResponseTransformer;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 /**
  * The class streams incoming requests from a Kafka topic and sends them further
@@ -56,6 +68,9 @@ public class KafkaTopicListener implements TopicListener {
     private final InfoType type;
     private Flux<DataFromTopic> dataFromTopic;
 
+    @Getter
+    private static S3AsyncClient s3AsynchClient;
+
     private static Gson gson = new GsonBuilder() //
             .disableHtmlEscaping() //
             .create(); //
@@ -65,11 +80,21 @@ public class KafkaTopicListener implements TopicListener {
     public static class NewFileEvent {
         @Getter
         private String filename;
+
+        @Getter
+        private String objectStoreBucket;
     }
 
     public KafkaTopicListener(ApplicationConfig applicationConfig, InfoType type) {
         this.applicationConfig = applicationConfig;
         this.type = type;
+        if (applicationConfig.isS3Enabled()) {
+            synchronized (KafkaTopicListener.class) {
+                if (s3AsynchClient == null) {
+                    s3AsynchClient = getS3AsyncClientBuilder().build();
+                }
+            }
+        }
     }
 
     @Override
@@ -92,26 +117,63 @@ public class KafkaTopicListener implements TopicListener {
                 .doFinally(sig -> logger.error("KafkaTopicReceiver stopped, reason: {}", sig)) //
                 .filter(t -> !t.value().isEmpty() || !t.key().isEmpty()) //
                 .map(input -> new DataFromTopic(input.key(), input.value())) //
-                .map(this::getDataFromFileIfNewPmFileEvent) //
+                .flatMap(this::getDataFromFileIfNewPmFileEvent) //
                 .publish() //
                 .autoConnect(1);
     }
 
-    private DataFromTopic getDataFromFileIfNewPmFileEvent(DataFromTopic data) {
+    private S3AsyncClientBuilder getS3AsyncClientBuilder() {
+        URI uri = URI.create(this.applicationConfig.getS3EndpointOverride());
+        return S3AsyncClient.builder() //
+                .region(Region.US_EAST_1) //
+                .endpointOverride(uri) //
+                .credentialsProvider(StaticCredentialsProvider.create( //
+                        AwsBasicCredentials.create(this.applicationConfig.getS3AccessKeyId(), //
+                                this.applicationConfig.getS3SecretAccessKey())));
+
+    }
+
+    private Mono<String> getDataFromS3Object(String bucket, String key) {
+        if (!this.applicationConfig.isS3Enabled()) {
+            logger.error("Missing S3 confinguration in application.yaml, ignoring bucket: {}, key: {}", bucket, key);
+            return Mono.empty();
+        }
+
+        GetObjectRequest request = GetObjectRequest.builder() //
+                .bucket(bucket) //
+                .key(key) //
+                .build();
+
+        CompletableFuture<ResponseBytes<GetObjectResponse>> future =
+                s3AsynchClient.getObject(request, AsyncResponseTransformer.toBytes());
+
+        return Mono.fromFuture(future) //
+                .map(b -> new String(b.asByteArray(), Charset.defaultCharset())) //
+                .doOnError(t -> logger.error("Failed to get file from S3 {}", t.getMessage())) //
+                .doOnEach(n -> logger.debug("Read file from S3: {} {}", bucket, key)) //
+                .onErrorResume(t -> Mono.empty());
+    }
+
+    private Mono<DataFromTopic> getDataFromFileIfNewPmFileEvent(DataFromTopic data) {
 
         if (!applicationConfig.getPmFilesPath().isEmpty() //
                 && this.type.getDataType() == InfoType.DataType.PM_DATA //
                 && data.value.length() < 1000) {
             try {
                 NewFileEvent ev = gson.fromJson(data.value, NewFileEvent.class);
-                Path path = Path.of(this.applicationConfig.getPmFilesPath(), ev.getFilename());
-                String pmReportJson = Files.readString(path, Charset.defaultCharset());
-                return new DataFromTopic(data.key, pmReportJson);
+                if (ev.getObjectStoreBucket() != null) {
+                    return getDataFromS3Object(ev.getObjectStoreBucket(), ev.getFilename()) //
+                            .map(str -> new DataFromTopic(data.key, str));
+                } else {
+                    Path path = Path.of(this.applicationConfig.getPmFilesPath(), ev.getFilename());
+                    String pmReportJson = Files.readString(path, Charset.defaultCharset());
+                    return Mono.just(new DataFromTopic(data.key, pmReportJson));
+                }
             } catch (Exception e) {
-                return data;
+                return Mono.just(data);
             }
         } else {
-            return data;
+            return Mono.just(data);
         }
     }
 
