@@ -25,14 +25,20 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonParser;
+import com.google.protobuf.AbstractMessage.Builder;
+import com.google.protobuf.Message;
+import com.google.protobuf.MessageOrBuilder;
+import com.google.protobuf.util.JsonFormat;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Map;
 
@@ -59,6 +65,8 @@ import org.oran.dmaapadapter.tasks.JobDataDistributor;
 import org.oran.dmaapadapter.tasks.ProducerRegstrationTask;
 import org.oran.dmaapadapter.tasks.TopicListener;
 import org.oran.dmaapadapter.tasks.TopicListeners;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -114,6 +122,82 @@ class ApplicationTest {
 
     @LocalServerPort
     int localServerHttpPort;
+
+    private final Logger logger = LoggerFactory.getLogger(ApplicationTest.class);
+
+    public static class ProtoJsonUtil {
+
+        /**
+         * Makes a Json from a given message or builder
+         *
+         * @param messageOrBuilder is the instance
+         * @return The string representation
+         * @throws IOException if any error occurs
+         */
+        public static String toJson(MessageOrBuilder messageOrBuilder) throws IOException {
+            return JsonFormat.printer().print(messageOrBuilder);
+        }
+
+        /**
+         * Makes a new instance of message based on the json and the class
+         *
+         * @param <T> is the class type
+         * @param json is the json instance
+         * @param clazz is the class instance
+         * @return An instance of T based on the json values
+         * @throws IOException if any error occurs
+         */
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        public static <T extends Message> T fromJson(String json, Class<T> clazz) throws IOException {
+            // https://stackoverflow.com/questions/27642021/calling-parsefrom-method-for-generic-protobuffer-class-in-java/33701202#33701202
+            Builder builder = null;
+            try {
+                // Since we are dealing with a Message type, we can call newBuilder()
+                builder = (Builder) clazz.getMethod("newBuilder").invoke(null);
+
+            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
+                    | NoSuchMethodException | SecurityException e) {
+                return null;
+            }
+
+            // The instance is placed into the builder values
+            JsonFormat.parser().ignoringUnknownFields().merge(json, builder);
+
+            // the instance will be from the build
+            return (T) builder.build();
+        }
+    }
+
+    @Test
+    void testProtoBuf() throws Exception {
+        String path = "./src/test/resources/A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json";
+
+        String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
+
+        PmProtoGenerated.PmRopFile proto = ProtoJsonUtil.fromJson(pmReportJson, PmProtoGenerated.PmRopFile.class);
+        byte[] bytes = proto.toByteArray();
+
+        int TIMES = 100000;
+        {
+            Instant startTime = Instant.now();
+            for (int i = 0; i < TIMES; ++i) {
+                PmProtoGenerated.PmRopFile.parseFrom(bytes);
+            }
+            long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
+            logger.info("*** Duration PROTO :" + durationSeconds + ", objects/second: " + TIMES / durationSeconds
+                    + " time: " + (float) durationSeconds / TIMES);
+        }
+        {
+            Instant startTime = Instant.now();
+            for (int i = 0; i < TIMES; ++i) {
+                PmReport reportsParsed = gson.fromJson(pmReportJson, PmReport.class);
+            }
+            long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
+            logger.info("*** Duration GSON :" + durationSeconds + ", objects/second: " + TIMES / durationSeconds
+                    + " time: " + (float) durationSeconds / TIMES);
+        }
+
+    }
 
     static class TestApplicationConfig extends ApplicationConfig {
         @Override
