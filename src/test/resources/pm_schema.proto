@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+message PmRopFile {
+
+    message Commoneventheader {
+        string domain = 1;
+        string eventId = 2;
+        uint32 sequence = 3;
+        string eventName = 4;
+        string sourceName = 5;
+        string reportingEntityName = 6;
+        string priority = 7;
+        uint64 startEpochMicrosec = 8;
+        uint64 lastEpochMicrosec = 9;
+        string version = 10;
+        string vesEventListenerVersion = 11;
+        string timeZoneOffset = 12;
+    }
+
+    message Measinfoid {
+        string sMeasInfoId = 1;
+    }
+
+    message Meastypes {
+        repeated string sMeasTypesList = 1;
+    }
+
+    message Measresults {
+        uint32 p = 1;
+        string sValue = 2;
+    }
+
+    message Measvalueslist {
+        string measObjInstId = 1;
+        string suspectFlag = 2;
+        repeated Measresults measResults = 3;
+    }
+
+    message Measinfolist {
+        Measinfoid measInfoId = 1;
+        Meastypes measTypes = 2;
+        repeated Measvalueslist measValuesList = 3;
+    }
+
+    message Measdatacollection {
+        uint32 granularityPeriod = 1;
+        string measuredEntityUserName = 2;
+        string measuredEntityDn = 3;
+        string measuredEntitySoftwareVersion = 4;
+        repeated Measinfolist measInfoList = 5;
+    }
+
+    message Perf3gppfields {
+        string perf3gppFieldsVersion = 1;
+        Measdatacollection measDataCollection = 2;
+    }
+
+    message Event {
+        Commoneventheader commonEventHeader = 1;
+        Perf3gppfields perf3gppFields = 2;
+    }
+
+    Event event = 1;
+}
