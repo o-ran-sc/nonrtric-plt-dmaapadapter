@@ -26,14 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonParser;
 
-import java.nio.charset.Charset;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -71,9 +70,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.TestPropertySource;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderOptions;
 import reactor.kafka.sender.SenderRecord;
+import software.amazon.awssdk.core.async.AsyncRequestBody;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.CreateBucketResponse;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
 @SuppressWarnings("java:S3577") // Rename class
 @SpringBootTest(webEnvironment = WebEnvironment.DEFINED_PORT)
@@ -169,8 +174,9 @@ class IntegrationWithKafka {
 
             // Create a listener to the output topic. The KafkaTopicListener happens to be
             // suitable for that,
-            InfoType type =
-                    InfoType.builder().id("TestReceiver").kafkaInputTopic(OUTPUT_TOPIC).dataType("dataType").build();
+            InfoType type = InfoType.builder() //
+                    .id("TestReceiver_" + outputTopic) //
+                    .kafkaInputTopic(OUTPUT_TOPIC).dataType("dataType").build();
 
             KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type);
 
@@ -304,7 +310,7 @@ class IntegrationWithKafka {
         }
     }
 
-    private SenderOptions<String, String> senderOptions() {
+    private SenderOptions<String, String> kafkaSenderOptions() {
         String bootstrapServers = this.applicationConfig.getKafkaBootStrapServers();
 
         Map<String, Object> props = new HashMap<>();
@@ -316,14 +322,14 @@ class IntegrationWithKafka {
         return SenderOptions.create(props);
     }
 
-    private SenderRecord<String, String, Integer> senderRecord(String data, String key, String typeId) {
+    private SenderRecord<String, String, Integer> kafkaSenderRecord(String data, String key, String typeId) {
         final InfoType infoType = this.types.get(typeId);
         int correlationMetadata = 2;
         return SenderRecord.create(new ProducerRecord<>(infoType.getKafkaInputTopic(), key, data), correlationMetadata);
     }
 
-    private void sendDataToStream(Flux<SenderRecord<String, String, Integer>> dataToSend) {
-        final KafkaSender<String, String> sender = KafkaSender.create(senderOptions());
+    private void sendDataToKafka(Flux<SenderRecord<String, String, Integer>> dataToSend) {
+        final KafkaSender<String, String> sender = KafkaSender.create(kafkaSenderOptions());
 
         sender.send(dataToSend) //
                 .doOnError(e -> logger.error("Send failed", e)) //
@@ -355,6 +361,37 @@ class IntegrationWithKafka {
         Thread.sleep(4000);
     }
 
+    private Mono<String> copyFileToS3Bucket(Path fileName, String s3Bucket, String s3Key) {
+
+        PutObjectRequest request = PutObjectRequest.builder() //
+                .bucket(s3Bucket) //
+                .key(s3Key) //
+                .build();
+
+        AsyncRequestBody body = AsyncRequestBody.fromFile(fileName);
+
+        CompletableFuture<PutObjectResponse> future = KafkaTopicListener.getS3AsynchClient().putObject(request, body);
+
+        return Mono.fromFuture(future) //
+                .map(f -> s3Key) //
+                .doOnError(t -> logger.error("Failed to store file in S3 {}", t.getMessage()))
+                .onErrorResume(t -> Mono.empty());
+    }
+
+    private Mono<String> createS3Bucket(String s3Bucket) {
+
+        CreateBucketRequest request = CreateBucketRequest.builder() //
+                .bucket(s3Bucket) //
+                .build();
+
+        CompletableFuture<CreateBucketResponse> future = KafkaTopicListener.getS3AsynchClient().createBucket(request);
+
+        return Mono.fromFuture(future) //
+                .map(f -> s3Bucket) //
+                .doOnError(t -> logger.debug("Could not create S3 bucket: {}", t.getMessage()))
+                .onErrorResume(t -> Mono.just(s3Bucket));
+    }
+
     @Test
     void simpleCase() throws Exception {
         final String JOB_ID = "ID";
@@ -367,8 +404,8 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
         waitForKafkaListener();
 
-        var dataToSend = Flux.just(senderRecord("Message", "", TYPE_ID));
-        sendDataToStream(dataToSend);
+        var dataToSend = Flux.just(kafkaSenderRecord("Message", "", TYPE_ID));
+        sendDataToKafka(dataToSend);
 
         verifiedReceivedByConsumer("Message");
     }
@@ -389,10 +426,10 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
         waitForKafkaListener();
 
-        var dataToSend = Flux.range(1, 3).map(i -> senderRecord("Message_" + i, "", TYPE_ID)); // Message_1,
-                                                                                               // Message_2
-                                                                                               // etc.
-        sendDataToStream(dataToSend);
+        var dataToSend = Flux.range(1, 3).map(i -> kafkaSenderRecord("Message_" + i, "", TYPE_ID)); // Message_1,
+        // Message_2
+        // etc.
+        sendDataToKafka(dataToSend);
 
         verifiedReceivedByConsumer("Message_1", "[\"Message_1\", \"Message_2\", \"Message_3\"]");
     }
@@ -411,8 +448,8 @@ class IntegrationWithKafka {
 
         String sendString = "testData " + Instant.now();
         String sendKey = "key " + Instant.now();
-        var dataToSend = Flux.just(senderRecord(sendString, sendKey, TYPE_ID));
-        sendDataToStream(dataToSend);
+        var dataToSend = Flux.just(kafkaSenderRecord(sendString, sendKey, TYPE_ID));
+        sendDataToKafka(dataToSend);
 
         await().untilAsserted(() -> assertThat(kafkaReceiver.lastValue()).isEqualTo(sendString));
         assertThat(kafkaReceiver.lastKey()).isEqualTo(sendKey);
@@ -443,9 +480,9 @@ class IntegrationWithKafka {
 
         Instant startTime = Instant.now();
 
-        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> senderRecord("Message_" + i, "", TYPE_ID)); // Message_1,
-                                                                                                           // etc.
-        sendDataToStream(dataToSend);
+        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord("Message_" + i, "", TYPE_ID)); // Message_1,
+        // etc.
+        sendDataToKafka(dataToSend);
 
         while (!kafkaReceiver.lastValue().equals("Message_" + NO_OF_OBJECTS)) {
             logger.info("sleeping {}", kafkaReceiver.lastValue());
@@ -458,7 +495,7 @@ class IntegrationWithKafka {
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
     @Test
-    void kafkaCharacteristics_pmFilter() throws Exception {
+    void kafkaCharacteristics_pmFilter_localFile() throws Exception {
         // Filter PM reports and sent to two jobs over Kafka
 
         final String JOB_ID = "kafkaCharacteristics";
@@ -488,18 +525,65 @@ class IntegrationWithKafka {
                 KafkaTopicListener.NewFileEvent.builder().filename("pm_report.json").build();
         String eventAsString = gson.toJson(event);
 
-        String path = "./src/test/resources/pm_report.json";
-        String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
-
-        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> senderRecord(eventAsString, "key", PM_TYPE_ID));
-        sendDataToStream(dataToSend);
+        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord(eventAsString, "key", PM_TYPE_ID));
+        sendDataToKafka(dataToSend);
 
         while (kafkaReceiver.count != NO_OF_OBJECTS) {
             logger.info("sleeping {}", kafkaReceiver.count);
             Thread.sleep(1000 * 1);
         }
 
-        // System.out.println(kafkaReceiver.receivedKafkaOutput.value);
+        final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
+        logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
+        logger.info("***  kafkaReceiver2 :" + kafkaReceiver.count);
+
+        printStatistics();
+    }
+
+    @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
+    @Test
+    void kafkaCharacteristics_pmFilter_s3() throws Exception {
+        // Filter PM reports and sent to two jobs over Kafka
+
+        final String JOB_ID = "kafkaCharacteristics";
+        final String JOB_ID2 = "kafkaCharacteristics2";
+
+        // Register producer, Register types
+        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
+        assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
+
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        filterData.getMeasTypes().add("succImmediateAssignProcs");
+        filterData.getMeasObjClass().add("UtranCell");
+
+        this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
+                restClient());
+        this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver2.OUTPUT_TOPIC, filterData), JOB_ID2,
+                restClient());
+
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
+        waitForKafkaListener();
+
+        final int NO_OF_OBJECTS = 100000;
+
+        Instant startTime = Instant.now();
+
+        KafkaTopicListener.NewFileEvent event = KafkaTopicListener.NewFileEvent.builder() //
+                .filename("pm_report.json").objectStoreBucket("ropfiles") //
+                .build();
+
+        createS3Bucket("ropfiles").block();
+        copyFileToS3Bucket(Path.of("./src/test/resources/pm_report.json"), "ropfiles", "pm_report.json").block();
+
+        String eventAsString = gson.toJson(event);
+
+        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord(eventAsString, "key", PM_TYPE_ID));
+        sendDataToKafka(dataToSend);
+
+        while (kafkaReceiver.count != NO_OF_OBJECTS) {
+            logger.info("sleeping {}", kafkaReceiver.count);
+            Thread.sleep(1000 * 1);
+        }
 
         final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
         logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
@@ -524,10 +608,10 @@ class IntegrationWithKafka {
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
 
-        var dataToSend = Flux.range(1, 100).map(i -> senderRecord("Message_" + i, "", TYPE_ID)); // Message_1,
-                                                                                                 // Message_2
-                                                                                                 // etc.
-        sendDataToStream(dataToSend); // this should not overflow
+        var dataToSend = Flux.range(1, 100).map(i -> kafkaSenderRecord("Message_" + i, "", TYPE_ID)); // Message_1,
+        // Message_2
+        // etc.
+        sendDataToKafka(dataToSend); // this should not overflow
 
         // Delete jobs, recreate one
         this.icsSimulatorController.deleteJob(JOB_ID1, restClient());
@@ -536,8 +620,8 @@ class IntegrationWithKafka {
         this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0, 1), JOB_ID2, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
-        dataToSend = Flux.just(senderRecord("Howdy", "", TYPE_ID));
-        sendDataToStream(dataToSend);
+        dataToSend = Flux.just(kafkaSenderRecord("Howdy", "", TYPE_ID));
+        sendDataToKafka(dataToSend);
 
         verifiedReceivedByConsumerLast("Howdy");
     }
