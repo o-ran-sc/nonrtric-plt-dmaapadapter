@@ -100,6 +100,18 @@ public class ApplicationConfig {
     @Value("${app.pm-files-path:}")
     private String pmFilesPath;
 
+    @Getter
+    @Value("${app.s3.endpointOverride:}")
+    private String s3EndpointOverride;
+
+    @Getter
+    @Value("${app.s3.accessKeyId:}")
+    private String s3AccessKeyId;
+
+    @Getter
+    @Value("${app.s3.secretAccessKey:}")
+    private String s3SecretAccessKey;
+
     private WebClientConfig webClientConfig = null;
 
     public WebClientConfig getWebClientConfig() {
@@ -121,6 +133,10 @@ public class ApplicationConfig {
                     .build();
         }
         return this.webClientConfig;
+    }
+
+    public boolean isS3Enabled() {
+        return !s3EndpointOverride.isEmpty();
     }
 
     // Adapter to parse the json format of the configuration file.
