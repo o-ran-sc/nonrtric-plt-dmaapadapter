@@ -79,7 +79,7 @@ public class ProducerRegstrationTask {
         this.types = types;
     }
 
-    @Scheduled(fixedRate = REGISTRATION_SUPERVISION_INTERVAL_MS)
+    @Scheduled(fixedRate = REGISTRATION_SUPERVISION_INTERVAL_MS, initialDelay = 1000)
     public void runSupervisionTask() {
         supervisionTask().subscribe( //
                 null, //

@@ -20,7 +20,7 @@
 
 package org.oran.dmaapadapter.tasks;
 
-
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,12 +31,18 @@ import lombok.ToString;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.oran.dmaapadapter.clients.AsyncRestClient;
+import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
+import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
+import org.oran.dmaapadapter.r1.ConsumerJobInfo;
+import org.oran.dmaapadapter.r1.FileReadyJobData;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
 
@@ -61,9 +67,10 @@ public class KafkaTopicListener implements TopicListener {
         private String objectStoreBucket;
     }
 
-    public KafkaTopicListener(ApplicationConfig applConfig, InfoType type) {
+    public KafkaTopicListener(ApplicationConfig applConfig, InfoType type, SecurityContext securityContext) {
         this.applicationConfig = applConfig;
         this.type = type;
+        createInputDataJob(securityContext).subscribe();
     }
 
     @Override
@@ -72,6 +79,35 @@ public class KafkaTopicListener implements TopicListener {
             this.dataFromTopic = startReceiveFromTopic(this.type.getKafkaClientId(this.applicationConfig));
         }
         return this.dataFromTopic;
+    }
+
+    private Mono<String> createInputDataJob(SecurityContext securityContext) {
+        if (type.getInputDataTypeId() == null) {
+            return Mono.just("");
+        }
+
+        AsyncRestClientFactory restClientFactory =
+                new AsyncRestClientFactory(applicationConfig.getWebClientConfig(), securityContext);
+        AsyncRestClient restClient = restClientFactory.createRestClientNoHttpProxy("");
+
+        com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+        FileReadyJobData jobData = new FileReadyJobData(type.getKafkaInputTopic());
+        ConsumerJobInfo info = new ConsumerJobInfo(type.getInputDataTypeId(), jobData, "DmaapAdapter", "", "");
+
+        final String JOB_ID = "5b3f4db6-3d9e-11ed-b878-0242ac120002";
+        String body = gson.toJson(info);
+
+        return Mono.delay(Duration.ofSeconds(3)) // this is for the unit test to work
+                .flatMap(x -> restClient.put(consumerJobUrl(JOB_ID), body))
+                .doOnError(t -> logger.warn("Could not create job of type {}, reason: {}", type.getInputDataTypeId(),
+                        t.getMessage()))
+                .onErrorResume(t -> Mono.empty()) //
+                .doOnNext(n -> logger.info("Created job: {}, type: {}", JOB_ID, type.getInputDataTypeId()));
+    }
+
+    private String consumerJobUrl(String jobId) {
+        return applicationConfig.getIcsBaseUrl() + "/data-consumer/v1/info-jobs/" + jobId;
+
     }
 
     private Flux<DataFromTopic> startReceiveFromTopic(String clientId) {

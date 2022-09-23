@@ -59,7 +59,7 @@ public class TopicListeners {
 
         for (InfoType type : types.getAll()) {
             if (type.isKafkaTopicDefined()) {
-                KafkaTopicListener topicConsumer = new KafkaTopicListener(appConfig, type);
+                KafkaTopicListener topicConsumer = new KafkaTopicListener(appConfig, type, securityContext);
                 kafkaTopicListeners.put(type.getId(), topicConsumer);
             }
             if (type.isDmaapTopicDefined()) {

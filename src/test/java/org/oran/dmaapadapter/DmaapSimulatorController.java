@@ -40,8 +40,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import springfox.documentation.annotations.ApiIgnore;
 
 @RestController("DmaapSimulatorController")
+@ApiIgnore
 @Tag(name = "DMAAP Simulator (exists only in test)")
 public class DmaapSimulatorController {
 
