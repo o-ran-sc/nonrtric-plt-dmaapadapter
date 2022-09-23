@@ -53,6 +53,7 @@ import reactor.core.publisher.Mono;
 @SuppressWarnings("squid:S2629") // Invoke method(s) only conditionally
 public abstract class JobDataDistributor {
     private static final Logger logger = LoggerFactory.getLogger(JobDataDistributor.class);
+
     @Getter
     private final Job job;
     private Disposable subscription;
@@ -95,7 +96,7 @@ public abstract class JobDataDistributor {
     }
 
     public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
-        stop();
+        collectHistoricalData();
 
         collectHistoricalData();
 
@@ -117,7 +118,7 @@ public abstract class JobDataDistributor {
     private void collectHistoricalData() {
         PmReportFilter filter = job.getFilter() instanceof PmReportFilter ? (PmReportFilter) job.getFilter() : null;
 
-        if (filter != null) {
+        if (filter != null && filter.getFilterData().getPmRopStartTime() != null) {
             this.fileStore.createLock(collectHistoricalDataLockName()) //
                     .flatMap(isLockGranted -> isLockGranted ? Mono.just(isLockGranted)
                             : Mono.error(new LockedException(collectHistoricalDataLockName()))) //
@@ -128,8 +129,6 @@ public abstract class JobDataDistributor {
                     .flatMap(event -> filterAndBuffer(event, this.job), 1) //
                     .flatMap(this::sendToClient, 1) //
                     .onErrorResume(this::handleCollectHistoricalDataError) //
-                    .collectList() //
-                    .flatMap(list -> fileStore.deleteLock(collectHistoricalDataLockName())) //
                     .subscribe();
         }
     }
@@ -140,9 +139,9 @@ public abstract class JobDataDistributor {
             logger.debug("Locked exception: {} job: {}", t.getMessage(), job.getId());
             return Mono.empty(); // Ignore
         } else {
-            return fileStore.deleteLock(collectHistoricalDataLockName()) //
-                    .map(bool -> "OK") //
-                    .onErrorResume(t2 -> Mono.empty());
+            return tryDeleteLockFile() //
+                    .map(bool -> "OK");
+
         }
     }
 
@@ -176,7 +175,7 @@ public abstract class JobDataDistributor {
     }
 
     private void handleExceptionInStream(Throwable t) {
-        logger.warn("HttpDataConsumer exception: {}, jobId: {}", t.getMessage(), job.getId());
+        logger.warn("JobDataDistributor exception: {}, jobId: {}", t.getMessage(), job.getId());
         stop();
     }
 
@@ -187,6 +186,13 @@ public abstract class JobDataDistributor {
             this.subscription.dispose();
             this.subscription = null;
         }
+        tryDeleteLockFile().subscribe();
+    }
+
+    private Mono<Boolean> tryDeleteLockFile() {
+        return fileStore.deleteLock(collectHistoricalDataLockName()) //
+                .doOnNext(res -> logger.debug("Removed lockfile {} {}", collectHistoricalDataLockName(), res))
+                .onErrorResume(t -> Mono.just(false));
     }
 
     public synchronized boolean isRunning() {

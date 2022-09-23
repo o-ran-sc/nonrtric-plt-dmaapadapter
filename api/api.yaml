@@ -293,6 +293,32 @@ paths:
             '*/*':
               schema:
                 type: object
+  /data-consumer/v1/info-jobs/{infoJobId}:
+    put:
+      tags:
+      - Information Coordinator Service Simulator (exists only in test)
+      operationId: putIndividualInfoJob
+      parameters:
+      - name: infoJobId
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/consumer_job'
+        required: true
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
   /actuator/loggers/{name}:
     get:
       tags:
@@ -465,6 +491,30 @@ components:
           format: int32
           example: 503
       description: Problem as defined in https://tools.ietf.org/html/rfc7807
+    consumer_job:
+      required:
+      - info_type_id
+      - job_definition
+      - job_owner
+      - job_result_uri
+      type: object
+      properties:
+        info_type_id:
+          type: string
+          description: Information type Idenitifier of the subscription job
+        job_result_uri:
+          type: string
+          description: The target URI of the subscribed information
+        job_owner:
+          type: string
+          description: Identity of the owner of the job
+        job_definition:
+          type: object
+          description: Information type specific job data
+        status_notification_uri:
+          type: string
+          description: The target of Information subscription job status notifications
+      description: Information for an Information Job
     void:
       type: object
       description: Void/empty

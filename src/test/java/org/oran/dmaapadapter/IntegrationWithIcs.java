@@ -285,7 +285,7 @@ class IntegrationWithIcs {
     @Test
     void testPmFilter() throws Exception {
         await().untilAsserted(() -> assertThat(producerRegstrationTask.isRegisteredInIcs()).isTrue());
-        final String TYPE_ID = "PmInformationType";
+        final String TYPE_ID = "PmDataOverRest";
 
         String jsonStr =
                 reQuote("{ 'filterType' : 'pmdata', 'filter': { 'measTypes': [ 'succImmediateAssignProcs' ] } }");

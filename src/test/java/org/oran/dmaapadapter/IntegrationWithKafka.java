@@ -46,6 +46,8 @@ import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
+import org.oran.dmaapadapter.datastore.DataStore;
+import org.oran.dmaapadapter.datastore.S3ObjectStore;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.r1.ConsumerJobInfo;
@@ -53,11 +55,7 @@ import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
-import org.oran.dmaapadapter.tasks.DataStore;
-import org.oran.dmaapadapter.tasks.DataStore.Bucket;
-import org.oran.dmaapadapter.tasks.FileStore;
 import org.oran.dmaapadapter.tasks.KafkaTopicListener;
-import org.oran.dmaapadapter.tasks.S3ObjectStore;
 import org.oran.dmaapadapter.tasks.TopicListener;
 import org.oran.dmaapadapter.tasks.TopicListeners;
 import org.slf4j.Logger;
@@ -83,11 +81,13 @@ import reactor.kafka.sender.SenderRecord;
         "server.ssl.key-store=./config/keystore.jks", //
         "app.webclient.trust-store=./config/truststore.jks", //
         "app.configuration-filepath=./src/test/resources/test_application_configuration.json", //
-        "app.pm-files-path=./src/test/resources/", "app.s3.locksBucket=ropfilelocks", "app.s3.bucket=ropfiles"}) //
+        "app.pm-files-path=./src/test/resources/", //
+        "app.s3.locksBucket=ropfilelocks", //
+        "app.s3.bucket=ropfiles"}) //
 class IntegrationWithKafka {
 
     final String TYPE_ID = "KafkaInformationType";
-    final String PM_TYPE_ID = "PmInformationTypeKafka";
+    final String PM_TYPE_ID = "PmDataOverKafka";
 
     @Autowired
     private ApplicationConfig applicationConfig;
@@ -166,7 +166,7 @@ class IntegrationWithKafka {
 
         int count = 0;
 
-        public KafkaReceiver(ApplicationConfig applicationConfig, String outputTopic) {
+        public KafkaReceiver(ApplicationConfig applicationConfig, String outputTopic, SecurityContext securityContext) {
             this.OUTPUT_TOPIC = outputTopic;
 
             // Create a listener to the output topic. The KafkaTopicListener happens to be
@@ -209,8 +209,8 @@ class IntegrationWithKafka {
     @BeforeEach
     void init() {
         if (kafkaReceiver == null) {
-            kafkaReceiver = new KafkaReceiver(this.applicationConfig, "ouputTopic");
-            kafkaReceiver2 = new KafkaReceiver(this.applicationConfig, "ouputTopic2");
+            kafkaReceiver = new KafkaReceiver(this.applicationConfig, "ouputTopic", this.securityContext);
+            kafkaReceiver2 = new KafkaReceiver(this.applicationConfig, "ouputTopic2", this.securityContext);
         }
         kafkaReceiver.reset();
         kafkaReceiver2.reset();
@@ -462,69 +462,6 @@ class IntegrationWithKafka {
 
         final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
         logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
-    }
-
-    @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
-    // @Test
-    void kafkaCharacteristics_pmFilter_localFile() throws Exception {
-        // Filter PM reports and sent to two jobs over Kafka
-
-        final String JOB_ID = "kafkaCharacteristics";
-        final String JOB_ID2 = "kafkaCharacteristics2";
-
-        // Register producer, Register types
-        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
-        assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
-
-        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.getMeasTypes().add("succImmediateAssignProcs");
-        filterData.getMeasObjClass().add("UtranCell");
-
-        this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
-                restClient());
-        this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver2.OUTPUT_TOPIC, filterData), JOB_ID2,
-                restClient());
-
-        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
-        waitForKafkaListener();
-
-        final int NO_OF_OBJECTS = 100;
-
-        Instant startTime = Instant.now();
-
-        KafkaTopicListener.NewFileEvent event =
-                KafkaTopicListener.NewFileEvent.builder().filename("pm_report.json").build();
-        String eventAsString = gson.toJson(event);
-
-        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord(eventAsString, "key", PM_TYPE_ID));
-        sendDataToKafka(dataToSend);
-
-        while (kafkaReceiver.count != NO_OF_OBJECTS) {
-            logger.info("sleeping {}", kafkaReceiver.count);
-            Thread.sleep(1000 * 1);
-        }
-
-        final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
-        logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
-        logger.info("***  kafkaReceiver2 :" + kafkaReceiver.count);
-
-        printStatistics();
-    }
-
-    @Test
-    void testListFiles() {
-        FileStore fileStore = new FileStore(applicationConfig);
-
-        fileStore.copyFileTo(Path.of("./src/test/resources/pm_report.json"),
-                "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json").block();
-
-        List<String> files = fileStore.listFiles(Bucket.FILES, "O-DU-112").collectList().block();
-        assertThat(files).hasSize(1);
-
-        files = fileStore.listFiles(Bucket.FILES, "O-DU-1122").collectList().block();
-        assertThat(files).hasSize(1);
-
-        fileStore.deleteObject(Bucket.FILES, files.get(0));
     }
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
