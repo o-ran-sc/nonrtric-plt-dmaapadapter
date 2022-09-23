@@ -32,7 +32,6 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -54,7 +53,11 @@ import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
+import org.oran.dmaapadapter.tasks.DataStore;
+import org.oran.dmaapadapter.tasks.DataStore.Bucket;
+import org.oran.dmaapadapter.tasks.FileStore;
 import org.oran.dmaapadapter.tasks.KafkaTopicListener;
+import org.oran.dmaapadapter.tasks.S3ObjectStore;
 import org.oran.dmaapadapter.tasks.TopicListener;
 import org.oran.dmaapadapter.tasks.TopicListeners;
 import org.slf4j.Logger;
@@ -70,15 +73,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.TestPropertySource;
 
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderOptions;
 import reactor.kafka.sender.SenderRecord;
-import software.amazon.awssdk.core.async.AsyncRequestBody;
-import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
-import software.amazon.awssdk.services.s3.model.CreateBucketResponse;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
 @SuppressWarnings("java:S3577") // Rename class
 @SpringBootTest(webEnvironment = WebEnvironment.DEFINED_PORT)
@@ -86,7 +83,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
         "server.ssl.key-store=./config/keystore.jks", //
         "app.webclient.trust-store=./config/truststore.jks", //
         "app.configuration-filepath=./src/test/resources/test_application_configuration.json", //
-        "app.pm-files-path=./src/test/resources/"}) //
+        "app.pm-files-path=./src/test/resources/", "app.s3.locksBucket=ropfilelocks", "app.s3.bucket=ropfiles"}) //
 class IntegrationWithKafka {
 
     final String TYPE_ID = "KafkaInformationType";
@@ -189,7 +186,7 @@ class IntegrationWithKafka {
         private void set(TopicListener.DataFromTopic receivedKafkaOutput) {
             this.receivedKafkaOutput = receivedKafkaOutput;
             this.count++;
-            logger.debug("*** received {}, {}", OUTPUT_TOPIC, receivedKafkaOutput);
+            logger.trace("*** received {}, {}", OUTPUT_TOPIC, receivedKafkaOutput);
         }
 
         synchronized String lastKey() {
@@ -217,6 +214,10 @@ class IntegrationWithKafka {
         }
         kafkaReceiver.reset();
         kafkaReceiver2.reset();
+
+        S3ObjectStore fileStore = new S3ObjectStore(applicationConfig);
+        fileStore.deleteBucket(DataStore.Bucket.FILES).block();
+        fileStore.deleteBucket(DataStore.Bucket.LOCKS).block();
     }
 
     @AfterEach
@@ -289,6 +290,7 @@ class IntegrationWithKafka {
     ConsumerJobInfo consumerJobInfoKafka(String topic, PmReportFilter.FilterData filterData) {
         try {
             Job.Parameters param = new Job.Parameters(filterData, Job.Parameters.PM_FILTER_TYPE, null, 1, topic);
+
             String str = gson.toJson(param);
             Object parametersObj = jsonObject(str);
 
@@ -359,37 +361,6 @@ class IntegrationWithKafka {
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
     private static void waitForKafkaListener() throws InterruptedException {
         Thread.sleep(4000);
-    }
-
-    private Mono<String> copyFileToS3Bucket(Path fileName, String s3Bucket, String s3Key) {
-
-        PutObjectRequest request = PutObjectRequest.builder() //
-                .bucket(s3Bucket) //
-                .key(s3Key) //
-                .build();
-
-        AsyncRequestBody body = AsyncRequestBody.fromFile(fileName);
-
-        CompletableFuture<PutObjectResponse> future = KafkaTopicListener.getS3AsynchClient().putObject(request, body);
-
-        return Mono.fromFuture(future) //
-                .map(f -> s3Key) //
-                .doOnError(t -> logger.error("Failed to store file in S3 {}", t.getMessage()))
-                .onErrorResume(t -> Mono.empty());
-    }
-
-    private Mono<String> createS3Bucket(String s3Bucket) {
-
-        CreateBucketRequest request = CreateBucketRequest.builder() //
-                .bucket(s3Bucket) //
-                .build();
-
-        CompletableFuture<CreateBucketResponse> future = KafkaTopicListener.getS3AsynchClient().createBucket(request);
-
-        return Mono.fromFuture(future) //
-                .map(f -> s3Bucket) //
-                .doOnError(t -> logger.debug("Could not create S3 bucket: {}", t.getMessage()))
-                .onErrorResume(t -> Mono.just(s3Bucket));
     }
 
     @Test
@@ -494,7 +465,7 @@ class IntegrationWithKafka {
     }
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
-    @Test
+    // @Test
     void kafkaCharacteristics_pmFilter_localFile() throws Exception {
         // Filter PM reports and sent to two jobs over Kafka
 
@@ -517,7 +488,7 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
         waitForKafkaListener();
 
-        final int NO_OF_OBJECTS = 100000;
+        final int NO_OF_OBJECTS = 100;
 
         Instant startTime = Instant.now();
 
@@ -538,6 +509,22 @@ class IntegrationWithKafka {
         logger.info("***  kafkaReceiver2 :" + kafkaReceiver.count);
 
         printStatistics();
+    }
+
+    @Test
+    void testListFiles() {
+        FileStore fileStore = new FileStore(applicationConfig);
+
+        fileStore.copyFileTo(Path.of("./src/test/resources/pm_report.json"),
+                "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json").block();
+
+        List<String> files = fileStore.listFiles(Bucket.FILES, "O-DU-112").collectList().block();
+        assertThat(files).hasSize(1);
+
+        files = fileStore.listFiles(Bucket.FILES, "O-DU-1122").collectList().block();
+        assertThat(files).hasSize(1);
+
+        fileStore.deleteObject(Bucket.FILES, files.get(0));
     }
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
@@ -564,16 +551,19 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
         waitForKafkaListener();
 
-        final int NO_OF_OBJECTS = 100000;
+        final int NO_OF_OBJECTS = 100;
 
         Instant startTime = Instant.now();
 
         KafkaTopicListener.NewFileEvent event = KafkaTopicListener.NewFileEvent.builder() //
-                .filename("pm_report.json").objectStoreBucket("ropfiles") //
+                .filename("pm_report.json").objectStoreBucket(applicationConfig.getS3Bucket()) //
                 .build();
 
-        createS3Bucket("ropfiles").block();
-        copyFileToS3Bucket(Path.of("./src/test/resources/pm_report.json"), "ropfiles", "pm_report.json").block();
+        S3ObjectStore fileStore = new S3ObjectStore(applicationConfig);
+
+        fileStore.createS3Bucket(DataStore.Bucket.FILES).block();
+        fileStore.copyFileToS3(DataStore.Bucket.FILES, Path.of("./src/test/resources/pm_report.json"), "pm_report.json")
+                .block();
 
         String eventAsString = gson.toJson(event);
 
@@ -590,6 +580,36 @@ class IntegrationWithKafka {
         logger.info("***  kafkaReceiver2 :" + kafkaReceiver.count);
 
         printStatistics();
+
+    }
+
+    @Test
+    void testHistoricalData() throws Exception {
+        // test
+        final String JOB_ID = "testHistoricalData";
+
+        S3ObjectStore fileStore = new S3ObjectStore(applicationConfig);
+
+        fileStore.createS3Bucket(DataStore.Bucket.FILES).block();
+        fileStore.createS3Bucket(DataStore.Bucket.LOCKS).block();
+
+        fileStore.copyFileToS3(DataStore.Bucket.FILES, Path.of("./src/test/resources/pm_report.json"),
+                "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json").block();
+
+        fileStore.copyFileToS3(DataStore.Bucket.FILES, Path.of("./src/test/resources/pm_report.json"),
+                "OTHER_SOURCENAME/test.json").block();
+
+        await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
+
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        filterData.getSourceNames().add("O-DU-1122");
+        filterData.setPmRopStartTime("1999-12-27T10:50:44.000-08:00");
+
+        this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
+                restClient());
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+
+        await().untilAsserted(() -> assertThat(kafkaReceiver.count).isEqualTo(1));
     }
 
     @Test
@@ -608,7 +628,7 @@ class IntegrationWithKafka {
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
 
-        var dataToSend = Flux.range(1, 100).map(i -> kafkaSenderRecord("Message_" + i, "", TYPE_ID)); // Message_1,
+        var dataToSend = Flux.range(1, 100).map(i -> kafkaSenderRecord("XMessage_" + i, "", TYPE_ID)); // Message_1,
         // Message_2
         // etc.
         sendDataToKafka(dataToSend); // this should not overflow

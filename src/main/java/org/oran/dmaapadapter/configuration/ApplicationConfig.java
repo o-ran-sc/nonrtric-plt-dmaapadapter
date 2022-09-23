@@ -116,6 +116,14 @@ public class ApplicationConfig {
     @Value("${app.s3.secretAccessKey:}")
     private String s3SecretAccessKey;
 
+    @Getter
+    @Value("${app.s3.locksBucket:}")
+    private String s3LocksBucket;
+
+    @Getter
+    @Value("${app.s3.bucket:}")
+    private String s3Bucket;
+
     private WebClientConfig webClientConfig = null;
 
     public WebClientConfig getWebClientConfig() {

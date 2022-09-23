@@ -95,7 +95,7 @@ public class TopicListeners {
 
     private JobDataDistributor createConsumer(Job job) {
         return !Strings.isEmpty(job.getParameters().getKafkaOutputTopic()) ? new KafkaJobDataDistributor(job, appConfig)
-                : new HttpJobDataDistributor(job);
+                : new HttpJobDataDistributor(job, appConfig);
     }
 
     private void addConsumer(Job job, MultiMap<JobDataDistributor> distributors,

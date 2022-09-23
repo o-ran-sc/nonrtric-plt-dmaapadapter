@@ -50,7 +50,7 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
     private final ApplicationConfig appConfig;
 
     public KafkaJobDataDistributor(Job job, ApplicationConfig appConfig) {
-        super(job);
+        super(job, appConfig);
         this.appConfig = appConfig;
     }
 
@@ -58,7 +58,7 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
     protected Mono<String> sendToClient(Filter.FilteredData data) {
         Job job = this.getJob();
 
-        logger.debug("Sending data '{}' to Kafka topic: {}", data, this.getJob().getParameters().getKafkaOutputTopic());
+        logger.trace("Sending data '{}' to Kafka topic: {}", data, this.getJob().getParameters().getKafkaOutputTopic());
 
         SenderRecord<String, String, Integer> senderRecord = senderRecord(data, job);
 

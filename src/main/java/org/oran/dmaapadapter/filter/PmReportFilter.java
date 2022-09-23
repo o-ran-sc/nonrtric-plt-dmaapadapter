@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.Map;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
@@ -48,6 +49,7 @@ public class PmReportFilter implements Filter {
             .disableHtmlEscaping() //
             .create();
 
+    @Getter
     private final FilterData filterData;
 
     @Getter
@@ -57,6 +59,9 @@ public class PmReportFilter implements Filter {
         final Collection<String> measTypes = new HashSet<>();
         final Collection<String> measuredEntityDns = new ArrayList<>();
         final Collection<String> measObjClass = new HashSet<>();
+
+        @Setter
+        String pmRopStartTime;
     }
 
     private static class MeasTypesIndexed extends PmReport.MeasTypes {

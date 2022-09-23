@@ -85,3 +85,5 @@ app:
     endpointOverride: http://localhost:9000
     accessKeyId: minio
     secretAccessKey: miniostorage
+    locksBucket: ropfilelocks
+    bucket: ropfiles

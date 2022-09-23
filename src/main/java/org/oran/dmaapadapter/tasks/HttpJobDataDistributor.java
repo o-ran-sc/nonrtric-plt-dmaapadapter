@@ -20,6 +20,7 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
@@ -35,8 +36,8 @@ import reactor.core.publisher.Mono;
 public class HttpJobDataDistributor extends JobDataDistributor {
     private static final Logger logger = LoggerFactory.getLogger(HttpJobDataDistributor.class);
 
-    public HttpJobDataDistributor(Job job) {
-        super(job);
+    public HttpJobDataDistributor(Job job, ApplicationConfig config) {
+        super(job, config);
     }
 
     @Override

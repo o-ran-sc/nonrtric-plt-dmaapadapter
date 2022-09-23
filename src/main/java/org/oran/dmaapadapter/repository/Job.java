@@ -184,6 +184,7 @@ public class Job {
     @Getter
     private final String lastUpdated;
 
+    @Getter
     private final Filter filter;
 
     @Getter
