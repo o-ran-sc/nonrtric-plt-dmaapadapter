@@ -44,6 +44,12 @@ public class InfoType {
     @Getter
     private String kafkaInputTopic;
 
+    @Getter
+    private String inputJobType;
+
+    @Getter
+    private Object inputJobDefinition;
+
     private String dataType;
 
     @Getter

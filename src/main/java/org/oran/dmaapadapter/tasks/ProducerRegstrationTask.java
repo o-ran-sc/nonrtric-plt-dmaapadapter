@@ -36,6 +36,7 @@ import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
 import org.oran.dmaapadapter.exceptions.ServiceException;
+import org.oran.dmaapadapter.r1.ConsumerJobInfo;
 import org.oran.dmaapadapter.r1.ProducerInfoTypeInfo;
 import org.oran.dmaapadapter.r1.ProducerRegistrationInfo;
 import org.oran.dmaapadapter.repository.InfoType;
@@ -128,15 +129,39 @@ public class ProducerRegstrationTask {
     }
 
     private Mono<String> registerTypesAndProducer() {
-        final int CONCURRENCY = 20;
+        final int CONCURRENCY = 1;
 
         return Flux.fromIterable(this.types.getAll()) //
                 .doOnNext(type -> logger.info("Registering type {}", type.getId())) //
+                .flatMap(this::createInputDataJob, CONCURRENCY)
                 .flatMap(type -> restClient.put(registerTypeUrl(type), gson.toJson(typeRegistrationInfo(type))),
                         CONCURRENCY) //
                 .collectList() //
                 .doOnNext(type -> logger.info("Registering producer")) //
                 .flatMap(resp -> restClient.put(producerRegistrationUrl(), gson.toJson(producerRegistrationInfo())));
+    }
+
+    private Mono<InfoType> createInputDataJob(InfoType type) {
+        if (type.getInputJobType() == null) {
+            return Mono.just(type);
+        }
+
+        ConsumerJobInfo info =
+                new ConsumerJobInfo(type.getInputJobType(), type.getInputJobDefinition(), "DmaapAdapter", "", "");
+
+        final String JOB_ID = type.getId() + "_5b3f4db6-3d9e-11ed-b878-0242ac120002";
+        String body = gson.toJson(info);
+
+        return restClient.put(consumerJobUrl(JOB_ID), body)
+                .doOnError(t -> logger.error("Could not create job of type {}, reason: {}", type.getInputJobType(),
+                        t.getMessage()))
+                .onErrorResume(t -> Mono.just("")) //
+                .doOnNext(n -> logger.info("Created job: {}, type: {}", JOB_ID, type.getInputJobType())) //
+                .map(x -> type);
+    }
+
+    private String consumerJobUrl(String jobId) {
+        return applicationConfig.getIcsBaseUrl() + "/data-consumer/v1/info-jobs/" + jobId;
     }
 
     private Object typeSpecifcInfoObject() {

@@ -8,21 +8,29 @@
       },
       {
          "id": "KafkaInformationType",
-         "kafkaInputTopic": "KafkaInput",
-         "useHttpProxy": false
+         "kafkaInputTopic": "KafkaInput"
       },
       {
-         "id": "PmInformationType",
+         "id": "PmDataOverRest",
          "dmaapTopicUrl": "/dmaap-topic-2",
          "useHttpProxy": false,
          "dataType": "PmData",
          "isJson": true
       },
       {
-         "id": "PmInformationTypeKafka",
-         "kafkaInputTopic": "PmFileData",
-         "useHttpProxy": false,
+         "id": "PmDataOverKafka",
+         "kafkaInputTopic": "FileReadyEvent",
          "dataType": "PmData",
+         "inputJobType": "xml-file-data-to-filestore",
+         "inputJobDefinition": {
+            "kafkaOutputTopic": "FileReadyEvent",
+            "filestore-output-bucket": "pm-files-json",
+            "filterType": "pmdata",
+            "filter": {
+               "inputCompression": "xml.gz",
+               "outputCompression": "none"
+            }
+         },
          "isJson": true
       }
    ]
