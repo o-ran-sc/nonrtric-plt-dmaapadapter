@@ -48,6 +48,38 @@
                 }
             }
         },
+        "consumer_job": {
+            "description": "Information for an Information Job",
+            "type": "object",
+            "required": [
+                "info_type_id",
+                "job_definition",
+                "job_owner",
+                "job_result_uri"
+            ],
+            "properties": {
+                "info_type_id": {
+                    "description": "Information type Idenitifier of the subscription job",
+                    "type": "string"
+                },
+                "job_result_uri": {
+                    "description": "The target URI of the subscribed information",
+                    "type": "string"
+                },
+                "job_owner": {
+                    "description": "Identity of the owner of the job",
+                    "type": "string"
+                },
+                "job_definition": {
+                    "description": "Information type specific job data",
+                    "type": "object"
+                },
+                "status_notification_uri": {
+                    "description": "The target of Information subscription job status notifications",
+                    "type": "string"
+                }
+            }
+        },
         "void": {
             "description": "Void/empty",
             "type": "object"
@@ -352,6 +384,24 @@
                 "content": {"*/*": {"schema": {"type": "object"}}}
             }},
             "tags": ["Actuator"]
+        }},
+        "/data-consumer/v1/info-jobs/{infoJobId}": {"put": {
+            "requestBody": {
+                "content": {"application/json": {"schema": {"$ref": "#/components/schemas/consumer_job"}}},
+                "required": true
+            },
+            "operationId": "putIndividualInfoJob",
+            "responses": {"200": {
+                "description": "OK",
+                "content": {"application/json": {"schema": {"type": "object"}}}
+            }},
+            "parameters": [{
+                "schema": {"type": "string"},
+                "in": "path",
+                "name": "infoJobId",
+                "required": true
+            }],
+            "tags": ["Information Coordinator Service Simulator (exists only in test)"]
         }},
         "/actuator/loggers/{name}": {
             "post": {

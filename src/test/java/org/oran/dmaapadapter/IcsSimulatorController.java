@@ -63,6 +63,7 @@ public class IcsSimulatorController {
         ProducerRegistrationInfo registrationInfo = null;
         Map<String, ProducerInfoTypeInfo> types = Collections.synchronizedMap(new HashMap<>());
         String infoProducerId = null;
+        ConsumerJobInfo createdJob = null;
 
         public TestResults() {}
 
@@ -70,6 +71,11 @@ public class IcsSimulatorController {
             registrationInfo = null;
             types.clear();
             infoProducerId = null;
+            createdJob = null;
+        }
+
+        public void setCreatedJob(ConsumerJobInfo informationJobObject) {
+            this.createdJob = informationJobObject;
         }
     }
 
@@ -102,6 +108,17 @@ public class IcsSimulatorController {
             @PathVariable("infoTypeId") String infoTypeId, //
             @RequestBody ProducerInfoTypeInfo registrationInfo) {
         testResults.types.put(infoTypeId, registrationInfo);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @PutMapping(path = "/data-consumer/v1/info-jobs/{infoJobId}", //
+            produces = MediaType.APPLICATION_JSON_VALUE, //
+            consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Object> putIndividualInfoJob( //
+            @PathVariable("infoJobId") String jobId, //
+            @RequestBody ConsumerJobInfo informationJobObject) {
+        logger.info("*** added consumer job {}", jobId);
+        testResults.setCreatedJob(informationJobObject);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 

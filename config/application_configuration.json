@@ -11,10 +11,15 @@
          "useHttpProxy": false
       },
       {
-         "id": "PmData",
-         "dmaapTopicUrl": "/events/PM_NOTIFICATION_OUTPUT/OpenDcae-c12/C12",
-         "useHttpProxy": true,
-         "dataType": "pmData"
+         "id": "PmDataOverKafka",
+         "kafkaInputTopic": "FileReadyEvent",
+         "dataType": "PmData",
+         "inputJobType": "xml-file-data-to-filestore",
+         "inputJobDefinition": {
+            "anyParameter1": "FileReadyEvent",
+            "anyParameter2": "whatEver"
+         },
+         "isJson": true
       }
    ]
 }
