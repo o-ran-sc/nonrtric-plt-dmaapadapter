@@ -36,6 +36,7 @@ import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
 import org.oran.dmaapadapter.exceptions.ServiceException;
+import org.oran.dmaapadapter.r1.ConsumerJobInfo;
 import org.oran.dmaapadapter.r1.ProducerInfoTypeInfo;
 import org.oran.dmaapadapter.r1.ProducerRegistrationInfo;
 import org.oran.dmaapadapter.repository.InfoType;
@@ -79,7 +80,7 @@ public class ProducerRegstrationTask {
         this.types = types;
     }
 
-    @Scheduled(fixedRate = REGISTRATION_SUPERVISION_INTERVAL_MS)
+    @Scheduled(fixedRate = REGISTRATION_SUPERVISION_INTERVAL_MS, initialDelay = 1000)
     public void runSupervisionTask() {
         supervisionTask().subscribe( //
                 null, //
@@ -132,11 +133,35 @@ public class ProducerRegstrationTask {
 
         return Flux.fromIterable(this.types.getAll()) //
                 .doOnNext(type -> logger.info("Registering type {}", type.getId())) //
+                .flatMap(this::createInputDataJob)
                 .flatMap(type -> restClient.put(registerTypeUrl(type), gson.toJson(typeRegistrationInfo(type))),
                         CONCURRENCY) //
                 .collectList() //
                 .doOnNext(type -> logger.info("Registering producer")) //
                 .flatMap(resp -> restClient.put(producerRegistrationUrl(), gson.toJson(producerRegistrationInfo())));
+    }
+
+    private Mono<InfoType> createInputDataJob(InfoType type) {
+        if (type.getInputJobType() == null) {
+            return Mono.just(type);
+        }
+
+        ConsumerJobInfo info =
+                new ConsumerJobInfo(type.getInputJobType(), type.getInputJobDefinition(), "DmaapAdapter", "", "");
+
+        final String JOB_ID = type.getId() + "_5b3f4db6-3d9e-11ed-b878-0242ac120002";
+        String body = gson.toJson(info);
+
+        return restClient.put(consumerJobUrl(JOB_ID), body)
+                .doOnError(t -> logger.warn("Could not create job of type {}, reason: {}", type.getInputJobType(),
+                        t.getMessage()))
+                .onErrorResume(t -> Mono.empty()) //
+                .doOnNext(n -> logger.info("Created job: {}, type: {}", JOB_ID, type.getInputJobType())) //
+                .map(x -> type);
+    }
+
+    private String consumerJobUrl(String jobId) {
+        return applicationConfig.getIcsBaseUrl() + "/data-consumer/v1/info-jobs/" + jobId;
     }
 
     private Object typeSpecifcInfoObject() {
