@@ -20,12 +20,15 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.util.zip.GZIPInputStream;
 
 import lombok.Getter;
 
@@ -225,6 +228,7 @@ public abstract class JobDataDistributor {
             if (ev.getObjectStoreBucket() != null) {
                 if (this.applConfig.isS3Enabled()) {
                     return fileStore.readFile(ev.getObjectStoreBucket(), ev.getFilename()) //
+                            .map(str -> unzip(str, ev.getFilename())) //
                             .map(str -> new DataFromTopic(data.key, str));
                 } else {
                     logger.error("S3 is not configured in application.yaml, ignoring: {}", data);
@@ -243,6 +247,21 @@ public abstract class JobDataDistributor {
         } catch (Exception e) {
             return Mono.just(data);
         }
+    }
+
+    private byte[] unzip(byte[] bytes, String fileName) {
+        if (!fileName.endsWith(".gz")) {
+            return bytes;
+        }
+
+        try (final GZIPInputStream gzipInput = new GZIPInputStream(new ByteArrayInputStream(bytes))) {
+
+            return gzipInput.readAllBytes();
+        } catch (IOException e) {
+            logger.error("Error while decompression, file: {}, reason: {}", fileName, e.getMessage());
+            return new byte[0];
+        }
+
     }
 
     private String quoteNonJson(String str, Job job) {

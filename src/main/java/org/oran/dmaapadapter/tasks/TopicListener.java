@@ -20,6 +20,8 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import java.nio.charset.StandardCharsets;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -42,6 +44,12 @@ public interface TopicListener {
             this.key = key;
             this.value = value;
         }
+
+        public DataFromTopic(String key, byte[] value) {
+            this.key = key;
+            this.value = new String(value, StandardCharsets.UTF_8);
+        }
+
     }
 
     public Flux<DataFromTopic> getFlux();

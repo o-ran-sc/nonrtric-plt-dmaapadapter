@@ -30,9 +30,9 @@ public interface DataStore {
 
     public Flux<String> listFiles(Bucket bucket, String prefix);
 
-    public Mono<String> readFile(Bucket bucket, String fileName);
+    public Mono<byte[]> readFile(Bucket bucket, String fileName);
 
-    public Mono<String> readFile(String bucket, String fileName);
+    public Mono<byte[]> readFile(String bucket, String fileName);
 
     public Mono<Boolean> createLock(String name);
 

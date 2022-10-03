@@ -52,9 +52,12 @@ public class InfoType {
 
     private String dataType;
 
-    @Getter
     @Builder.Default
     private boolean isJson = false;
+
+    public boolean isJson() {
+        return this.isJson || getDataType() == DataType.PM_DATA;
+    }
 
     public boolean isKafkaTopicDefined() {
         return StringUtils.hasLength(kafkaInputTopic);

@@ -493,14 +493,14 @@ class IntegrationWithKafka {
         Instant startTime = Instant.now();
 
         KafkaTopicListener.NewFileEvent event = KafkaTopicListener.NewFileEvent.builder() //
-                .filename("pm_report.json").objectStoreBucket(applicationConfig.getS3Bucket()) //
+                .filename("pm_report.json.gz").objectStoreBucket(applicationConfig.getS3Bucket()) //
                 .build();
 
         S3ObjectStore fileStore = new S3ObjectStore(applicationConfig);
 
         fileStore.createS3Bucket(DataStore.Bucket.FILES).block();
-        fileStore.copyFileToS3(DataStore.Bucket.FILES, Path.of("./src/test/resources/pm_report.json"), "pm_report.json")
-                .block();
+        fileStore.copyFileToS3(DataStore.Bucket.FILES, Path.of("./src/test/resources/pm_report.json.gz"),
+                "pm_report.json.gz").block();
 
         String eventAsString = gson.toJson(event);
 
