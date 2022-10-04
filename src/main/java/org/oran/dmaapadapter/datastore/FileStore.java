@@ -29,8 +29,6 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
-import org.oran.dmaapadapter.exceptions.ServiceException;
-import org.springframework.http.HttpStatus;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -72,14 +70,10 @@ public class FileStore implements DataStore {
         return fullName.substring(applicationConfig.getPmFilesPath().length());
     }
 
-    public Mono<String> readFile(String bucket, String fileName) {
-        return Mono.error(new ServiceException("readFile from bucket Not implemented", HttpStatus.CONFLICT));
-    }
-
     @Override
-    public Mono<String> readFile(Bucket bucket, String fileName) {
+    public Mono<byte[]> readFile(Bucket bucket, String fileName) {
         try {
-            String contents = Files.readString(path(fileName));
+            byte[] contents = Files.readAllBytes(path(fileName));
             return Mono.just(contents);
         } catch (Exception e) {
             return Mono.error(e);

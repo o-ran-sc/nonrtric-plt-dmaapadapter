@@ -56,6 +56,7 @@ import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
 import org.oran.dmaapadapter.tasks.KafkaTopicListener;
+import org.oran.dmaapadapter.tasks.NewFileEvent;
 import org.oran.dmaapadapter.tasks.TopicListener;
 import org.oran.dmaapadapter.tasks.TopicListeners;
 import org.slf4j.Logger;
@@ -216,8 +217,9 @@ class IntegrationWithKafka {
         kafkaReceiver2.reset();
 
         S3ObjectStore fileStore = new S3ObjectStore(applicationConfig);
-        fileStore.deleteBucket(DataStore.Bucket.FILES).block();
-        fileStore.deleteBucket(DataStore.Bucket.LOCKS).block();
+        fileStore.createS3Bucket(DataStore.Bucket.FILES).block();
+        fileStore.createS3Bucket(DataStore.Bucket.LOCKS).block();
+
     }
 
     @AfterEach
@@ -230,6 +232,10 @@ class IntegrationWithKafka {
 
         this.consumerController.testResults.reset();
         this.icsSimulatorController.testResults.reset();
+
+        S3ObjectStore fileStore = new S3ObjectStore(applicationConfig);
+        fileStore.deleteBucket(DataStore.Bucket.FILES).block();
+        fileStore.deleteBucket(DataStore.Bucket.LOCKS).block();
     }
 
     private AsyncRestClient restClient(boolean useTrustValidation) {
@@ -488,19 +494,20 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
         waitForKafkaListener();
 
-        final int NO_OF_OBJECTS = 100;
+        final int NO_OF_OBJECTS = 50000;
 
         Instant startTime = Instant.now();
 
-        KafkaTopicListener.NewFileEvent event = KafkaTopicListener.NewFileEvent.builder() //
-                .filename("pm_report.json.gz").objectStoreBucket(applicationConfig.getS3Bucket()) //
+        final String FILE_NAME = "pm_report.json.gz";
+
+        NewFileEvent event = NewFileEvent.builder() //
+                .filename(FILE_NAME) //
                 .build();
 
         S3ObjectStore fileStore = new S3ObjectStore(applicationConfig);
 
         fileStore.createS3Bucket(DataStore.Bucket.FILES).block();
-        fileStore.copyFileToS3(DataStore.Bucket.FILES, Path.of("./src/test/resources/pm_report.json.gz"),
-                "pm_report.json.gz").block();
+        fileStore.copyFileToS3(DataStore.Bucket.FILES, Path.of("./src/test/resources/" + FILE_NAME), FILE_NAME).block();
 
         String eventAsString = gson.toJson(event);
 

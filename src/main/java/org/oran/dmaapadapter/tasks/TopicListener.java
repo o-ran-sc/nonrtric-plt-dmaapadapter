@@ -38,6 +38,7 @@ public interface TopicListener {
 
         @Getter
         @Setter
+        @ToString.Exclude
         private PmReport cachedPmReport;
 
         public DataFromTopic(String key, String value) {

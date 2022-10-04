@@ -21,7 +21,6 @@
 package org.oran.dmaapadapter.datastore;
 
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
@@ -127,13 +126,8 @@ public class S3ObjectStore implements DataStore {
     }
 
     @Override
-    public Mono<String> readFile(Bucket bucket, String fileName) {
+    public Mono<byte[]> readFile(Bucket bucket, String fileName) {
         return getDataFromS3Object(bucket(bucket), fileName);
-    }
-
-    @Override
-    public Mono<String> readFile(String bucket, String fileName) {
-        return getDataFromS3Object(bucket, fileName);
     }
 
     public Mono<String> putObject(Bucket bucket, String fileName, String bodyString) {
@@ -239,7 +233,7 @@ public class S3ObjectStore implements DataStore {
         ;
     }
 
-    private Mono<String> getDataFromS3Object(String bucket, String key) {
+    private Mono<byte[]> getDataFromS3Object(String bucket, String key) {
 
         GetObjectRequest request = GetObjectRequest.builder() //
                 .bucket(bucket) //
@@ -250,8 +244,9 @@ public class S3ObjectStore implements DataStore {
                 s3AsynchClient.getObject(request, AsyncResponseTransformer.toBytes());
 
         return Mono.fromFuture(future) //
-                .map(b -> new String(b.asByteArray(), Charset.defaultCharset())) //
-                .doOnError(t -> logger.error("Failed to get file from S3 {}", t.getMessage())) //
+                .map(b -> b.asByteArray()) //
+                .doOnError(t -> logger.error("Failed to get file from S3, key:{}, bucket: {}, {}", key, bucket,
+                        t.getMessage())) //
                 .doOnEach(n -> logger.debug("Read file from S3: {} {}", bucket, key)) //
                 .onErrorResume(t -> Mono.empty());
     }

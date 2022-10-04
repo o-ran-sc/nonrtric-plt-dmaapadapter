@@ -53,6 +53,7 @@ import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
+import org.oran.dmaapadapter.datastore.FileStore;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.PmReport;
 import org.oran.dmaapadapter.filter.PmReportFilter;
@@ -62,6 +63,7 @@ import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
 import org.oran.dmaapadapter.tasks.JobDataDistributor;
+import org.oran.dmaapadapter.tasks.NewFileEvent;
 import org.oran.dmaapadapter.tasks.ProducerRegstrationTask;
 import org.oran.dmaapadapter.tasks.TopicListener;
 import org.oran.dmaapadapter.tasks.TopicListeners;
@@ -91,7 +93,7 @@ import reactor.test.StepVerifier;
         "app.webclient.trust-store=./config/truststore.jks", //
         "app.webclient.trust-store-used=true", //
         "app.configuration-filepath=./src/test/resources/test_application_configuration.json", //
-        "app.s3.endpointOverride="})
+        "app.pm-files-path=/tmp", "app.s3.endpointOverride="})
 class ApplicationTest {
 
     @Autowired
@@ -494,11 +496,15 @@ class ApplicationTest {
 
         // Return one messagefrom DMAAP and verify that the job (consumer) receives a
         // filtered PM message
-        String path = "./src/test/resources/pm_report.json";
-        String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
+        String path = "./src/test/resources/pm_report.json.gz";
+        FileStore fs = new FileStore(this.applicationConfig);
+        fs.copyFileTo(Path.of(path), "pm_report.json.gz");
+
+        NewFileEvent event = NewFileEvent.builder().filename("pm_report.json.gz").build();
+
         DmaapSimulatorController.addPmResponse("{}"); // This should just be discarded
 
-        DmaapSimulatorController.addPmResponse(pmReportJson);
+        DmaapSimulatorController.addPmResponse(gson.toJson(event));
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));

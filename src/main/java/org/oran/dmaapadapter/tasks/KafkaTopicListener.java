@@ -24,10 +24,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.ToString;
-
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
@@ -49,16 +45,6 @@ public class KafkaTopicListener implements TopicListener {
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
     private Flux<DataFromTopic> dataFromTopic;
-
-    @ToString
-    @Builder
-    public static class NewFileEvent {
-        @Getter
-        private String filename;
-
-        @Getter
-        private String objectStoreBucket;
-    }
 
     public KafkaTopicListener(ApplicationConfig applConfig, InfoType type) {
         this.applicationConfig = applConfig;

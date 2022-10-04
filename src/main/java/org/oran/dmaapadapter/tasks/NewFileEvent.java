@@ -20,24 +20,16 @@
 
 package org.oran.dmaapadapter.tasks;
 
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
-public interface DataStore {
-    public enum Bucket {
-        FILES, LOCKS
-    }
+import lombok.Builder;
+import lombok.Getter;
+import lombok.ToString;
 
-    public Flux<String> listFiles(Bucket bucket, String prefix);
 
-    public Mono<byte[]> readFile(Bucket bucket, String fileName);
 
-    public Mono<byte[]> readFile(String bucket, String fileName);
-
-    public Mono<Boolean> createLock(String name);
-
-    public Mono<Boolean> deleteLock(String name);
-
-    public Mono<Boolean> deleteObject(Bucket bucket, String name);
-
+@ToString
+@Builder
+public class NewFileEvent {
+    @Getter
+    private String filename;
 }

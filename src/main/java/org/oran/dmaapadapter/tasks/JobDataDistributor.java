@@ -22,9 +22,6 @@ package org.oran.dmaapadapter.tasks;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -33,12 +30,14 @@ import java.util.zip.GZIPInputStream;
 import lombok.Getter;
 
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
+import org.oran.dmaapadapter.datastore.DataStore;
+import org.oran.dmaapadapter.datastore.FileStore;
+import org.oran.dmaapadapter.datastore.S3ObjectStore;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.Job;
-import org.oran.dmaapadapter.tasks.KafkaTopicListener.NewFileEvent;
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,7 +151,7 @@ public abstract class JobDataDistributor {
 
     private Flux<TopicListener.DataFromTopic> createFakeEvent(String fileName) {
 
-        NewFileEvent ev = new NewFileEvent(fileName, this.applConfig.getS3Bucket());
+        NewFileEvent ev = new NewFileEvent(fileName);
 
         return Flux.just(new TopicListener.DataFromTopic("", gson.toJson(ev)));
     }
@@ -225,25 +224,16 @@ public abstract class JobDataDistributor {
 
         try {
             NewFileEvent ev = gson.fromJson(data.value, NewFileEvent.class);
-            if (ev.getObjectStoreBucket() != null) {
-                if (this.applConfig.isS3Enabled()) {
-                    return fileStore.readFile(ev.getObjectStoreBucket(), ev.getFilename()) //
-                            .map(str -> unzip(str, ev.getFilename())) //
-                            .map(str -> new DataFromTopic(data.key, str));
-                } else {
-                    logger.error("S3 is not configured in application.yaml, ignoring: {}", data);
-                    return Mono.empty();
-                }
-            } else {
-                if (applConfig.getPmFilesPath().isEmpty() || ev.getFilename() == null) {
-                    logger.debug("Passing data {}", data);
-                    return Mono.just(data);
-                } else {
-                    Path path = Path.of(this.applConfig.getPmFilesPath(), ev.getFilename());
-                    String pmReportJson = Files.readString(path, Charset.defaultCharset());
-                    return Mono.just(new DataFromTopic(data.key, pmReportJson));
-                }
+
+            if (ev.getFilename() == null) {
+                logger.warn("Ignoring received message: {}", data);
+                return Mono.empty();
             }
+
+            return fileStore.readFile(DataStore.Bucket.FILES, ev.getFilename()) //
+                    .map(bytes -> unzip(bytes, ev.getFilename())) //
+                    .map(bytes -> new DataFromTopic(data.key, bytes));
+
         } catch (Exception e) {
             return Mono.just(data);
         }
