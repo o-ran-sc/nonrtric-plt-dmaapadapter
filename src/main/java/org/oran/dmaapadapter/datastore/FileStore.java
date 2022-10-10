@@ -21,6 +21,8 @@
 package org.oran.dmaapadapter.datastore;
 
 import java.io.File;
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -29,11 +31,15 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.FileSystemUtils;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public class FileStore implements DataStore {
+    private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     ApplicationConfig applicationConfig;
 
@@ -47,6 +53,8 @@ public class FileStore implements DataStore {
         if (!root.toFile().exists()) {
             root = root.getParent();
         }
+
+        logger.debug("Listing files in: {}", root);
 
         List<String> result = new ArrayList<>();
         try (Stream<Path> stream = Files.walk(root, Integer.MAX_VALUE)) {
@@ -62,12 +70,18 @@ public class FileStore implements DataStore {
     private void filterListFiles(Path path, String prefix, List<String> result) {
         if (path.toFile().isFile() && externalName(path).startsWith(prefix)) {
             result.add(externalName(path));
+        } else {
+            logger.debug("Ignoring file {} that does not start with: {}", path, prefix);
         }
     }
 
-    private String externalName(Path f) {
-        String fullName = f.toString();
-        return fullName.substring(applicationConfig.getPmFilesPath().length());
+    private String externalName(Path path) {
+        String fullName = path.toString();
+        String externalName = fullName.substring(applicationConfig.getPmFilesPath().length());
+        if (externalName.startsWith("/")) {
+            externalName = externalName.substring(1);
+        }
+        return externalName;
     }
 
     @Override
@@ -119,6 +133,15 @@ public class FileStore implements DataStore {
 
     private Path path(String name) {
         return Path.of(applicationConfig.getPmFilesPath(), name);
+    }
+
+    public void deleteFiles() {
+        try {
+            FileSystemUtils.deleteRecursively(Path.of(applicationConfig.getPmFilesPath()));
+        } catch (IOException e) {
+            logger.debug("Could not delete directory: {}, reason; {}", applicationConfig.getPmFilesPath(),
+                    e.getMessage());
+        }
     }
 
 }

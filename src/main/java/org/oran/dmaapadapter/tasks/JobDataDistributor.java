@@ -95,6 +95,12 @@ public abstract class JobDataDistributor {
         this.job = job;
         this.applConfig = applConfig;
         this.fileStore = applConfig.isS3Enabled() ? new S3ObjectStore(applConfig) : new FileStore(applConfig);
+
+        if (applConfig.isS3Enabled()) {
+            S3ObjectStore fs = new S3ObjectStore(applConfig);
+            fs.createS3Bucket(DataStore.Bucket.FILES).subscribe();
+            fs.createS3Bucket(DataStore.Bucket.LOCKS).subscribe();
+        }
     }
 
     public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
@@ -120,9 +126,14 @@ public abstract class JobDataDistributor {
 
         if (filter != null && filter.getFilterData().getPmRopStartTime() != null) {
             this.fileStore.createLock(collectHistoricalDataLockName()) //
-                    .flatMap(isLockGranted -> isLockGranted ? Mono.just(isLockGranted)
+                    .flatMap(isLockGranted -> Boolean.TRUE.equals(isLockGranted) ? Mono.just(isLockGranted)
                             : Mono.error(new LockedException(collectHistoricalDataLockName()))) //
-                    .flatMapMany(b -> Flux.fromIterable(filter.getFilterData().getSourceNames()))
+                    .doOnNext(n -> logger.debug("Checking historical PM ROP files, jobId: {}", this.job.getId())) //
+                    .doOnError(t -> logger.debug("Skipping check of historical PM ROP files, already done. jobId: {}",
+                            this.job.getId())) //
+                    .flatMapMany(b -> Flux.fromIterable(filter.getFilterData().getSourceNames())) //
+                    .doOnNext(sourceName -> logger.debug("Checking source name: {}, jobId: {}", sourceName,
+                            this.job.getId())) //
                     .flatMap(sourceName -> fileStore.listFiles(DataStore.Bucket.FILES, sourceName), 1) //
                     .filter(fileName -> filterStartTime(filter.getFilterData().getPmRopStartTime(), fileName)) //
                     .map(this::createFakeEvent) //
@@ -134,14 +145,12 @@ public abstract class JobDataDistributor {
     }
 
     private Mono<String> handleCollectHistoricalDataError(Throwable t) {
-
         if (t instanceof LockedException) {
             logger.debug("Locked exception: {} job: {}", t.getMessage(), job.getId());
             return Mono.empty(); // Ignore
         } else {
             return tryDeleteLockFile() //
                     .map(bool -> "OK");
-
         }
     }
 
@@ -159,15 +168,24 @@ public abstract class JobDataDistributor {
     private boolean filterStartTime(String startTimeStr, String fileName) {
         // A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json
         try {
-            String fileTimePart = fileName.substring(fileName.lastIndexOf("/") + 2);
-            fileTimePart = fileTimePart.substring(0, 18);
+            if (fileName.endsWith(".json") || fileName.endsWith(".json.gz")) {
 
-            DateTimeFormatter formatter = new DateTimeFormatterBuilder().appendPattern("yyyyMMdd.HHmmZ").toFormatter();
+                String fileTimePart = fileName.substring(fileName.lastIndexOf("/") + 2);
+                fileTimePart = fileTimePart.substring(0, 18);
 
-            OffsetDateTime fileStartTime = OffsetDateTime.parse(fileTimePart, formatter);
-            OffsetDateTime startTime = OffsetDateTime.parse(startTimeStr);
+                DateTimeFormatter formatter =
+                        new DateTimeFormatterBuilder().appendPattern("yyyyMMdd.HHmmZ").toFormatter();
 
-            return startTime.isBefore(fileStartTime);
+                OffsetDateTime fileStartTime = OffsetDateTime.parse(fileTimePart, formatter);
+                OffsetDateTime startTime = OffsetDateTime.parse(startTimeStr);
+                boolean isBefore = startTime.isBefore(fileStartTime);
+                logger.debug("Checking file: {}, fileStartTime: {}, filterStartTime: {}, isBefore: {}", fileName,
+                        fileStartTime, startTime, isBefore);
+                return isBefore;
+            } else {
+                return false;
+            }
+
         } catch (Exception e) {
             logger.warn("Time parsing exception: {}", e.getMessage());
             return false;
