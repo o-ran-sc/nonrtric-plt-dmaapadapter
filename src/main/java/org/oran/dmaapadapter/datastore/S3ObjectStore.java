@@ -81,7 +81,6 @@ public class S3ObjectStore implements DataStore {
                 .credentialsProvider(StaticCredentialsProvider.create( //
                         AwsBasicCredentials.create(applicationConfig.getS3AccessKeyId(), //
                                 applicationConfig.getS3SecretAccessKey())));
-
     }
 
     @Override

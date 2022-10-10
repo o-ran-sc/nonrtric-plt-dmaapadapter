@@ -93,7 +93,8 @@ import reactor.test.StepVerifier;
         "app.webclient.trust-store=./config/truststore.jks", //
         "app.webclient.trust-store-used=true", //
         "app.configuration-filepath=./src/test/resources/test_application_configuration.json", //
-        "app.pm-files-path=/tmp", "app.s3.endpointOverride="})
+        "app.pm-files-path=/tmp/dmaapadaptor", //
+        "app.s3.endpointOverride="})
 class ApplicationTest {
 
     @Autowired
@@ -250,6 +251,9 @@ class ApplicationTest {
         assertThat(this.jobs.size()).isZero();
         assertThat(this.consumerController.testResults.receivedBodies).isEmpty();
         assertThat(this.consumerController.testResults.receivedHeaders).isEmpty();
+
+        FileStore fileStore = new FileStore(applicationConfig);
+        fileStore.deleteFiles();
     }
 
     @AfterEach
@@ -514,6 +518,35 @@ class ApplicationTest {
 
         PmReportArray reportsParsed = gson.fromJson(receivedFiltered, PmReportArray.class);
         assertThat(reportsParsed).hasSize(1);
+    }
+
+    @Test
+    void testHistoricalData() throws Exception {
+        // test
+        final String JOB_ID = "testHistoricalData";
+
+        // Register producer, Register types
+        waitForRegistration();
+
+        FileStore fileStore = new FileStore(applicationConfig);
+        fileStore.copyFileTo(Path.of("./src/test/resources/pm_report.json"),
+                "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json").block();
+
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        filterData.getSourceNames().add("O-DU-1122");
+        filterData.setPmRopStartTime("1999-12-27T10:50:44.000-08:00");
+
+        Job.Parameters param = new Job.Parameters(filterData, Job.Parameters.PM_FILTER_TYPE,
+                new Job.BufferTimeout(123, 456), null, null);
+        String paramJson = gson.toJson(param);
+        ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverRest", "EI_PM_JOB_ID", toJson(paramJson));
+
+        this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
+
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+
+        ConsumerController.TestResults consumer = this.consumerController.testResults;
+        await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
     }
 
     @Test
