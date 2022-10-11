@@ -144,11 +144,13 @@ public class S3ObjectStore implements DataStore {
                 .doOnError(t -> logger.error("Failed to store file in S3 {}", t.getMessage()));
     }
 
-    public Mono<String> copyFileToS3(Bucket bucket, Path fromFile, String toFile) {
-        return copyFileToS3Bucket(bucket(bucket), fromFile, toFile);
+    @Override
+    public Mono<String> copyFileTo(Path fromFile, String toFile) {
+        return copyFileToS3Bucket(bucket(Bucket.FILES), fromFile, toFile);
     }
 
-    public Mono<String> createS3Bucket(Bucket bucket) {
+    @Override
+    public Mono<String> create(Bucket bucket) {
         return createS3Bucket(bucket(bucket));
     }
 
@@ -166,6 +168,7 @@ public class S3ObjectStore implements DataStore {
                 .onErrorResume(t -> Mono.just(s3Bucket));
     }
 
+    @Override
     public Mono<String> deleteBucket(Bucket bucket) {
         return listFiles(bucket, "") //
                 .flatMap(key -> deleteObject(bucket, key)) //

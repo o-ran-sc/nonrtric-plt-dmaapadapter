@@ -98,8 +98,8 @@ public abstract class JobDataDistributor {
 
         if (applConfig.isS3Enabled()) {
             S3ObjectStore fs = new S3ObjectStore(applConfig);
-            fs.createS3Bucket(DataStore.Bucket.FILES).subscribe();
-            fs.createS3Bucket(DataStore.Bucket.LOCKS).subscribe();
+            fs.create(DataStore.Bucket.FILES).subscribe();
+            fs.create(DataStore.Bucket.LOCKS).subscribe();
         }
     }
 

@@ -117,7 +117,7 @@ public class IcsSimulatorController {
     public ResponseEntity<Object> putIndividualInfoJob( //
             @PathVariable("infoJobId") String jobId, //
             @RequestBody ConsumerJobInfo informationJobObject) {
-        logger.info("*** added consumer job {}", jobId);
+        logger.debug("*** added consumer job {}", jobId);
         testResults.setCreatedJob(informationJobObject);
         return new ResponseEntity<>(HttpStatus.OK);
     }
@@ -133,7 +133,7 @@ public class IcsSimulatorController {
         }
         assertThat(type).isNotNull();
         validateJsonObjectAgainstSchema(job.jobDefinition, type.jobDataSchema);
-        logger.info("ICS Simulator PUT job: {}", body);
+        logger.debug("ICS Simulator PUT job: {}", body);
         restClient.post(url, body, MediaType.APPLICATION_JSON).block();
     }
 
@@ -158,7 +158,7 @@ public class IcsSimulatorController {
 
     public void deleteJob(String jobId, AsyncRestClient restClient) {
         String url = this.testResults.registrationInfo.jobCallbackUrl + "/" + jobId;
-        logger.info("ICS Simulator DELETE job: {}", url);
+        logger.debug("ICS Simulator DELETE job: {}", url);
         restClient.delete(url).block();
 
     }

@@ -63,6 +63,9 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
         SenderRecord<String, String, Integer> senderRecord = senderRecord(data, job);
 
         return this.sender.send(Mono.just(senderRecord)) //
+                .doOnError(t -> logger.warn("Failed to send to Kafka, job: {}, reason: {}", this.getJob().getId(),
+                        t.getMessage())) //
+                .onErrorResume(t -> Mono.empty()) //
                 .collectList() //
                 .map(x -> data.value);
     }

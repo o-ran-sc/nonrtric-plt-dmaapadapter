@@ -53,7 +53,10 @@ import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
+import org.oran.dmaapadapter.datastore.DataStore;
+import org.oran.dmaapadapter.datastore.DataStore.Bucket;
 import org.oran.dmaapadapter.datastore.FileStore;
+import org.oran.dmaapadapter.datastore.S3ObjectStore;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.PmReport;
 import org.oran.dmaapadapter.filter.PmReportFilter;
@@ -252,8 +255,14 @@ class ApplicationTest {
         assertThat(this.consumerController.testResults.receivedBodies).isEmpty();
         assertThat(this.consumerController.testResults.receivedHeaders).isEmpty();
 
-        FileStore fileStore = new FileStore(applicationConfig);
-        fileStore.deleteFiles();
+        DataStore fileStore = this.dataStore();
+        fileStore.create(DataStore.Bucket.FILES).block();
+        fileStore.create(DataStore.Bucket.LOCKS).block();
+    }
+
+    private DataStore dataStore() {
+        return this.applicationConfig.isS3Enabled() ? new S3ObjectStore(applicationConfig)
+                : new FileStore(applicationConfig);
     }
 
     @AfterEach
@@ -265,6 +274,10 @@ class ApplicationTest {
 
         this.consumerController.testResults.reset();
         this.icsSimulatorController.testResults.reset();
+
+        FileStore fileStore = new FileStore(applicationConfig);
+        fileStore.deleteBucket(Bucket.FILES);
+        fileStore.deleteBucket(Bucket.LOCKS);
 
     }
 

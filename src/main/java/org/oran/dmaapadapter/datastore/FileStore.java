@@ -105,6 +105,7 @@ public class FileStore implements DataStore {
         }
     }
 
+    @Override
     public Mono<String> copyFileTo(Path from, String to) {
         try {
             Path toPath = path(to);
@@ -131,17 +132,24 @@ public class FileStore implements DataStore {
         }
     }
 
+    @Override
+    public Mono<String> create(Bucket bucket) {
+        return Mono.just("OK");
+    }
+
     private Path path(String name) {
         return Path.of(applicationConfig.getPmFilesPath(), name);
     }
 
-    public void deleteFiles() {
+    @Override
+    public Mono<String> deleteBucket(Bucket bucket) {
         try {
             FileSystemUtils.deleteRecursively(Path.of(applicationConfig.getPmFilesPath()));
         } catch (IOException e) {
             logger.debug("Could not delete directory: {}, reason; {}", applicationConfig.getPmFilesPath(),
                     e.getMessage());
         }
+        return Mono.just("OK");
     }
 
 }

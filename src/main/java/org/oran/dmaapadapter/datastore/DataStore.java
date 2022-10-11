@@ -20,6 +20,8 @@
 
 package org.oran.dmaapadapter.datastore;
 
+import java.nio.file.Path;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -37,5 +39,11 @@ public interface DataStore {
     public Mono<Boolean> deleteLock(String name);
 
     public Mono<Boolean> deleteObject(Bucket bucket, String name);
+
+    public Mono<String> copyFileTo(Path from, String to);
+
+    public Mono<String> create(DataStore.Bucket bucket);
+
+    public Mono<String> deleteBucket(Bucket bucket);
 
 }

@@ -85,7 +85,7 @@ public class ConsumerController {
                     content = @Content(schema = @Schema(implementation = VoidResponse.class))) //
     })
     public ResponseEntity<Object> postData(@RequestBody String body, @RequestHeader Map<String, String> headers) {
-        logger.info("Received by consumer: {}", body);
+        logger.debug("Received by consumer: {}", body);
         testResults.receivedBodies.add(body);
         testResults.receivedHeaders.add(headers);
         return new ResponseEntity<>(HttpStatus.OK);

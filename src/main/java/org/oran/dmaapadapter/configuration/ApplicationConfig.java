@@ -148,7 +148,7 @@ public class ApplicationConfig {
     }
 
     public boolean isS3Enabled() {
-        return !s3EndpointOverride.isEmpty();
+        return !(s3EndpointOverride.isBlank() || s3Bucket.isBlank());
     }
 
     // Adapter to parse the json format of the configuration file.
