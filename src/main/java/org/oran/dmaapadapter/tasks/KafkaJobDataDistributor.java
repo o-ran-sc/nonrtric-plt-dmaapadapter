@@ -57,14 +57,14 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
     @Override
     protected Mono<String> sendToClient(Filter.FilteredData data) {
         Job job = this.getJob();
-
-        logger.trace("Sending data '{}' to Kafka topic: {}", data, this.getJob().getParameters().getKafkaOutputTopic());
-
         SenderRecord<String, String, Integer> senderRecord = senderRecord(data, job);
 
+        logger.trace("Sending data '{}' to Kafka topic: {}", data, job.getParameters().getKafkaOutputTopic());
+
         return this.sender.send(Mono.just(senderRecord)) //
-                .doOnError(t -> logger.warn("Failed to send to Kafka, job: {}, reason: {}", this.getJob().getId(),
-                        t.getMessage())) //
+                .doOnNext(n -> logger.debug("Sent data to Kafka topic: {}", job.getParameters().getKafkaOutputTopic())) //
+                .doOnError(
+                        t -> logger.warn("Failed to send to Kafka, job: {}, reason: {}", job.getId(), t.getMessage())) //
                 .onErrorResume(t -> Mono.empty()) //
                 .collectList() //
                 .map(x -> data.value);

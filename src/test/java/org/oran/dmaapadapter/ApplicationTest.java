@@ -55,8 +55,6 @@ import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
 import org.oran.dmaapadapter.datastore.DataStore;
 import org.oran.dmaapadapter.datastore.DataStore.Bucket;
-import org.oran.dmaapadapter.datastore.FileStore;
-import org.oran.dmaapadapter.datastore.S3ObjectStore;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.PmReport;
 import org.oran.dmaapadapter.filter.PmReportFilter;
@@ -261,8 +259,7 @@ class ApplicationTest {
     }
 
     private DataStore dataStore() {
-        return this.applicationConfig.isS3Enabled() ? new S3ObjectStore(applicationConfig)
-                : new FileStore(applicationConfig);
+        return DataStore.create(this.applicationConfig);
     }
 
     @AfterEach
@@ -275,7 +272,7 @@ class ApplicationTest {
         this.consumerController.testResults.reset();
         this.icsSimulatorController.testResults.reset();
 
-        FileStore fileStore = new FileStore(applicationConfig);
+        DataStore fileStore = DataStore.create(applicationConfig);
         fileStore.deleteBucket(Bucket.FILES);
         fileStore.deleteBucket(Bucket.LOCKS);
 
@@ -514,7 +511,7 @@ class ApplicationTest {
         // Return one messagefrom DMAAP and verify that the job (consumer) receives a
         // filtered PM message
         String path = "./src/test/resources/pm_report.json.gz";
-        FileStore fs = new FileStore(this.applicationConfig);
+        DataStore fs = DataStore.create(this.applicationConfig);
         fs.copyFileTo(Path.of(path), "pm_report.json.gz");
 
         NewFileEvent event = NewFileEvent.builder().filename("pm_report.json.gz").build();
@@ -541,7 +538,7 @@ class ApplicationTest {
         // Register producer, Register types
         waitForRegistration();
 
-        FileStore fileStore = new FileStore(applicationConfig);
+        DataStore fileStore = DataStore.create(this.applicationConfig);
         fileStore.copyFileTo(Path.of("./src/test/resources/pm_report.json"),
                 "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json").block();
 

@@ -38,7 +38,7 @@ import org.springframework.util.FileSystemUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-public class FileStore implements DataStore {
+class FileStore implements DataStore {
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     ApplicationConfig applicationConfig;
@@ -48,7 +48,7 @@ public class FileStore implements DataStore {
     }
 
     @Override
-    public Flux<String> listFiles(Bucket bucket, String prefix) {
+    public Flux<String> listObjects(Bucket bucket, String prefix) {
         Path root = Path.of(applicationConfig.getPmFilesPath(), prefix);
         if (!root.toFile().exists()) {
             root = root.getParent();
@@ -85,7 +85,7 @@ public class FileStore implements DataStore {
     }
 
     @Override
-    public Mono<byte[]> readFile(Bucket bucket, String fileName) {
+    public Mono<byte[]> readObject(Bucket bucket, String fileName) {
         try {
             byte[] contents = Files.readAllBytes(path(fileName));
             return Mono.just(contents);

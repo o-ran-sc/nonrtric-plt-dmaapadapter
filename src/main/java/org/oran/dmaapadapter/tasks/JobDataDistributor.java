@@ -20,25 +20,18 @@
 
 package org.oran.dmaapadapter.tasks;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
-import java.util.zip.GZIPInputStream;
 
 import lombok.Getter;
 
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.datastore.DataStore;
-import org.oran.dmaapadapter.datastore.FileStore;
-import org.oran.dmaapadapter.datastore.S3ObjectStore;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.PmReportFilter;
-import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.Job;
-import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -62,7 +55,7 @@ public abstract class JobDataDistributor {
     private final ErrorStats errorStats = new ErrorStats();
     private final ApplicationConfig applConfig;
 
-    private final DataStore fileStore;
+    private final DataStore dataStore;
     private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
 
     private class ErrorStats {
@@ -94,13 +87,9 @@ public abstract class JobDataDistributor {
     protected JobDataDistributor(Job job, ApplicationConfig applConfig) {
         this.job = job;
         this.applConfig = applConfig;
-        this.fileStore = applConfig.isS3Enabled() ? new S3ObjectStore(applConfig) : new FileStore(applConfig);
-
-        if (applConfig.isS3Enabled()) {
-            S3ObjectStore fs = new S3ObjectStore(applConfig);
-            fs.create(DataStore.Bucket.FILES).subscribe();
-            fs.create(DataStore.Bucket.LOCKS).subscribe();
-        }
+        this.dataStore = DataStore.create(applConfig);
+        this.dataStore.create(DataStore.Bucket.FILES).subscribe();
+        this.dataStore.create(DataStore.Bucket.LOCKS).subscribe();
     }
 
     public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
@@ -125,7 +114,7 @@ public abstract class JobDataDistributor {
         PmReportFilter filter = job.getFilter() instanceof PmReportFilter ? (PmReportFilter) job.getFilter() : null;
 
         if (filter != null && filter.getFilterData().getPmRopStartTime() != null) {
-            this.fileStore.createLock(collectHistoricalDataLockName()) //
+            this.dataStore.createLock(collectHistoricalDataLockName()) //
                     .flatMap(isLockGranted -> Boolean.TRUE.equals(isLockGranted) ? Mono.just(isLockGranted)
                             : Mono.error(new LockedException(collectHistoricalDataLockName()))) //
                     .doOnNext(n -> logger.debug("Checking historical PM ROP files, jobId: {}", this.job.getId())) //
@@ -134,10 +123,12 @@ public abstract class JobDataDistributor {
                     .flatMapMany(b -> Flux.fromIterable(filter.getFilterData().getSourceNames())) //
                     .doOnNext(sourceName -> logger.debug("Checking source name: {}, jobId: {}", sourceName,
                             this.job.getId())) //
-                    .flatMap(sourceName -> fileStore.listFiles(DataStore.Bucket.FILES, sourceName), 1) //
+                    .flatMap(sourceName -> dataStore.listObjects(DataStore.Bucket.FILES, sourceName), 1) //
                     .filter(fileName -> filterStartTime(filter.getFilterData().getPmRopStartTime(), fileName)) //
                     .map(this::createFakeEvent) //
-                    .flatMap(event -> filterAndBuffer(event, this.job), 1) //
+                    .flatMap(data -> KafkaTopicListener.getDataFromFileIfNewPmFileEvent(data, this.job.getType(),
+                            dataStore), 100)
+                    .map(job::filter) //
                     .flatMap(this::sendToClient, 1) //
                     .onErrorResume(this::handleCollectHistoricalDataError) //
                     .subscribe();
@@ -158,11 +149,11 @@ public abstract class JobDataDistributor {
         return "collectHistoricalDataLock" + this.job.getId();
     }
 
-    private Flux<TopicListener.DataFromTopic> createFakeEvent(String fileName) {
+    private TopicListener.DataFromTopic createFakeEvent(String fileName) {
 
         NewFileEvent ev = new NewFileEvent(fileName);
 
-        return Flux.just(new TopicListener.DataFromTopic("", gson.toJson(ev)));
+        return new TopicListener.DataFromTopic("", gson.toJson(ev));
     }
 
     private boolean filterStartTime(String startTimeStr, String fileName) {
@@ -208,7 +199,7 @@ public abstract class JobDataDistributor {
     }
 
     private Mono<Boolean> tryDeleteLockFile() {
-        return fileStore.deleteLock(collectHistoricalDataLockName()) //
+        return dataStore.deleteLock(collectHistoricalDataLockName()) //
                 .doOnNext(res -> logger.debug("Removed lockfile {} {}", collectHistoricalDataLockName(), res))
                 .onErrorResume(t -> Mono.just(false));
     }
@@ -220,7 +211,6 @@ public abstract class JobDataDistributor {
     private Flux<Filter.FilteredData> filterAndBuffer(Flux<TopicListener.DataFromTopic> inputFlux, Job job) {
         Flux<Filter.FilteredData> filtered = //
                 inputFlux.doOnNext(data -> job.getStatistics().received(data.value)) //
-                        .flatMap(this::getDataFromFileIfNewPmFileEvent, 100) //
                         .map(job::filter) //
                         .filter(f -> !f.isEmpty()) //
                         .doOnNext(f -> job.getStatistics().filtered(f.value)); //
@@ -233,43 +223,6 @@ public abstract class JobDataDistributor {
                     .map(buffered -> new Filter.FilteredData("", buffered.toString()));
         }
         return filtered;
-    }
-
-    private Mono<DataFromTopic> getDataFromFileIfNewPmFileEvent(DataFromTopic data) {
-        if (this.job.getType().getDataType() != InfoType.DataType.PM_DATA || data.value.length() > 1000) {
-            return Mono.just(data);
-        }
-
-        try {
-            NewFileEvent ev = gson.fromJson(data.value, NewFileEvent.class);
-
-            if (ev.getFilename() == null) {
-                logger.warn("Ignoring received message: {}", data);
-                return Mono.empty();
-            }
-
-            return fileStore.readFile(DataStore.Bucket.FILES, ev.getFilename()) //
-                    .map(bytes -> unzip(bytes, ev.getFilename())) //
-                    .map(bytes -> new DataFromTopic(data.key, bytes));
-
-        } catch (Exception e) {
-            return Mono.just(data);
-        }
-    }
-
-    private byte[] unzip(byte[] bytes, String fileName) {
-        if (!fileName.endsWith(".gz")) {
-            return bytes;
-        }
-
-        try (final GZIPInputStream gzipInput = new GZIPInputStream(new ByteArrayInputStream(bytes))) {
-
-            return gzipInput.readAllBytes();
-        } catch (IOException e) {
-            logger.error("Error while decompression, file: {}, reason: {}", fileName, e.getMessage());
-            return new byte[0];
-        }
-
     }
 
     private String quoteNonJson(String str, Job job) {

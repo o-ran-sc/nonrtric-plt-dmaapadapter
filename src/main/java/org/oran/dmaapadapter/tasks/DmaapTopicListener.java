@@ -26,6 +26,7 @@ import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
 import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
+import org.oran.dmaapadapter.datastore.DataStore;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,7 @@ public class DmaapTopicListener implements TopicListener {
     private final InfoType type;
     private final com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
     private Flux<DataFromTopic> dataFromDmaap;
+    private final DataStore dataStore;
 
     public DmaapTopicListener(ApplicationConfig applicationConfig, InfoType type, SecurityContext securityContext) {
         AsyncRestClientFactory restclientFactory =
@@ -53,6 +55,7 @@ public class DmaapTopicListener implements TopicListener {
         this.dmaapRestClient = restclientFactory.createRestClientNoHttpProxy("");
         this.applicationConfig = applicationConfig;
         this.type = type;
+        this.dataStore = DataStore.create(applicationConfig);
     }
 
     @Override
@@ -69,9 +72,11 @@ public class DmaapTopicListener implements TopicListener {
                 .doOnNext(input -> logger.debug("Received from DMaap: {} :{}", this.type.getDmaapTopicUrl(), input)) //
                 .doOnError(t -> logger.error("DmaapTopicListener error: {}", t.getMessage())) //
                 .doFinally(sig -> logger.error("DmaapTopicListener stopped, reason: {}", sig)) //
+                .map(input -> new DataFromTopic("", input))
+                .flatMap(data -> KafkaTopicListener.getDataFromFileIfNewPmFileEvent(data, type, dataStore), 100)
                 .publish() //
-                .autoConnect() //
-                .map(input -> new DataFromTopic("", input)); //
+                .autoConnect();
+
     }
 
     private String getDmaapUrl() {

@@ -20,20 +20,26 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
+import org.oran.dmaapadapter.datastore.DataStore;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
+
 
 /**
  * The class streams incoming requests from a Kafka topic and sends them further
@@ -45,10 +51,13 @@ public class KafkaTopicListener implements TopicListener {
     private final ApplicationConfig applicationConfig;
     private final InfoType type;
     private Flux<DataFromTopic> dataFromTopic;
+    private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
+    private final DataStore dataStore;
 
     public KafkaTopicListener(ApplicationConfig applConfig, InfoType type) {
         this.applicationConfig = applConfig;
         this.type = type;
+        this.dataStore = DataStore.create(applConfig);
     }
 
     @Override
@@ -71,6 +80,7 @@ public class KafkaTopicListener implements TopicListener {
                 .doFinally(sig -> logger.error("KafkaTopicReceiver stopped, reason: {}", sig)) //
                 .filter(t -> !t.value().isEmpty() || !t.key().isEmpty()) //
                 .map(input -> new DataFromTopic(input.key(), input.value())) //
+                .flatMap(data -> getDataFromFileIfNewPmFileEvent(data, type, dataStore), 100) //
                 .publish() //
                 .autoConnect(1);
     }
@@ -90,6 +100,44 @@ public class KafkaTopicListener implements TopicListener {
 
         return ReceiverOptions.<String, String>create(consumerProps)
                 .subscription(Collections.singleton(this.type.getKafkaInputTopic()));
+    }
+
+    public static Mono<DataFromTopic> getDataFromFileIfNewPmFileEvent(DataFromTopic data, InfoType type,
+            DataStore fileStore) {
+        if (type.getDataType() != InfoType.DataType.PM_DATA || data.value.length() > 1000) {
+            return Mono.just(data);
+        }
+
+        try {
+            NewFileEvent ev = gson.fromJson(data.value, NewFileEvent.class);
+
+            if (ev.getFilename() == null) {
+                logger.warn("Ignoring received message: {}", data);
+                return Mono.empty();
+            }
+
+            return fileStore.readObject(DataStore.Bucket.FILES, ev.getFilename()) //
+                    .map(bytes -> unzip(bytes, ev.getFilename())) //
+                    .map(bytes -> new DataFromTopic(data.key, bytes));
+
+        } catch (Exception e) {
+            return Mono.just(data);
+        }
+    }
+
+    private static byte[] unzip(byte[] bytes, String fileName) {
+        if (!fileName.endsWith(".gz")) {
+            return bytes;
+        }
+
+        try (final GZIPInputStream gzipInput = new GZIPInputStream(new ByteArrayInputStream(bytes))) {
+
+            return gzipInput.readAllBytes();
+        } catch (IOException e) {
+            logger.error("Error while decompression, file: {}, reason: {}", fileName, e.getMessage());
+            return new byte[0];
+        }
+
     }
 
 }

@@ -22,6 +22,8 @@ package org.oran.dmaapadapter.datastore;
 
 import java.nio.file.Path;
 
+import org.oran.dmaapadapter.configuration.ApplicationConfig;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -30,9 +32,9 @@ public interface DataStore {
         FILES, LOCKS
     }
 
-    public Flux<String> listFiles(Bucket bucket, String prefix);
+    public Flux<String> listObjects(Bucket bucket, String prefix);
 
-    public Mono<byte[]> readFile(Bucket bucket, String fileName);
+    public Mono<byte[]> readObject(Bucket bucket, String name);
 
     public Mono<Boolean> createLock(String name);
 
@@ -45,5 +47,9 @@ public interface DataStore {
     public Mono<String> create(DataStore.Bucket bucket);
 
     public Mono<String> deleteBucket(Bucket bucket);
+
+    public static DataStore create(ApplicationConfig config) {
+        return config.isS3Enabled() ? new S3ObjectStore(config) : new FileStore(config);
+    }
 
 }

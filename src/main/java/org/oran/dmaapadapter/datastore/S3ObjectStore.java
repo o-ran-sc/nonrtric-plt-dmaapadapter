@@ -54,7 +54,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
-public class S3ObjectStore implements DataStore {
+class S3ObjectStore implements DataStore {
     private static final Logger logger = LoggerFactory.getLogger(S3ObjectStore.class);
     private final ApplicationConfig applicationConfig;
 
@@ -84,7 +84,7 @@ public class S3ObjectStore implements DataStore {
     }
 
     @Override
-    public Flux<String> listFiles(Bucket bucket, String prefix) {
+    public Flux<String> listObjects(Bucket bucket, String prefix) {
         return listObjectsInBucket(bucket(bucket), prefix).map(S3Object::key);
     }
 
@@ -125,7 +125,7 @@ public class S3ObjectStore implements DataStore {
     }
 
     @Override
-    public Mono<byte[]> readFile(Bucket bucket, String fileName) {
+    public Mono<byte[]> readObject(Bucket bucket, String fileName) {
         return getDataFromS3Object(bucket(bucket), fileName);
     }
 
@@ -170,7 +170,7 @@ public class S3ObjectStore implements DataStore {
 
     @Override
     public Mono<String> deleteBucket(Bucket bucket) {
-        return listFiles(bucket, "") //
+        return listObjects(bucket, "") //
                 .flatMap(key -> deleteObject(bucket, key)) //
                 .collectList() //
                 .flatMap(list -> deleteBucketFromS3Storage(bucket)) //

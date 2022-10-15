@@ -48,8 +48,6 @@ import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
 import org.oran.dmaapadapter.datastore.DataStore;
-import org.oran.dmaapadapter.datastore.FileStore;
-import org.oran.dmaapadapter.datastore.S3ObjectStore;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.r1.ConsumerJobInfo;
@@ -90,7 +88,7 @@ import reactor.kafka.sender.SenderRecord;
         "app.s3.bucket="}) //
 class IntegrationWithKafka {
 
-    final String TYPE_ID = "KafkaInformationType";
+    final String KAFKA_TYPE_ID = "KafkaInformationType";
     final String PM_TYPE_ID = "PmDataOverKafka";
 
     @Autowired
@@ -177,7 +175,9 @@ class IntegrationWithKafka {
             // suitable for that,
             InfoType type = InfoType.builder() //
                     .id("TestReceiver_" + outputTopic) //
-                    .kafkaInputTopic(OUTPUT_TOPIC).dataType("dataType").build();
+                    .kafkaInputTopic(OUTPUT_TOPIC) //
+                    .dataType("dataType") //
+                    .build();
 
             KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type);
 
@@ -190,7 +190,7 @@ class IntegrationWithKafka {
         private void set(TopicListener.DataFromTopic receivedKafkaOutput) {
             this.receivedKafkaOutput = receivedKafkaOutput;
             this.count++;
-            logger.trace("*** received {}, {}", OUTPUT_TOPIC, receivedKafkaOutput);
+            logger.debug("*** received {}, {}", OUTPUT_TOPIC, receivedKafkaOutput);
         }
 
         synchronized String lastKey() {
@@ -288,7 +288,7 @@ class IntegrationWithKafka {
     ConsumerJobInfo consumerJobInfo(String filter, Duration maxTime, int maxSize, int maxConcurrency) {
         try {
             String targetUri = baseUrl() + ConsumerController.CONSUMER_TARGET_URL;
-            return new ConsumerJobInfo(TYPE_ID,
+            return new ConsumerJobInfo(KAFKA_TYPE_ID,
                     jobParametersAsJsonObject(filter, maxTime.toMillis(), maxSize, maxConcurrency), "owner", targetUri,
                     "");
         } catch (Exception e) {
@@ -315,7 +315,7 @@ class IntegrationWithKafka {
             String str = gson.toJson(param);
             Object parametersObj = jsonObject(str);
 
-            return new ConsumerJobInfo(TYPE_ID, parametersObj, "owner", null, "");
+            return new ConsumerJobInfo(KAFKA_TYPE_ID, parametersObj, "owner", null, "");
         } catch (Exception e) {
             return null;
         }
@@ -384,7 +384,7 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
         waitForKafkaListener();
 
-        var dataToSend = Flux.just(kafkaSenderRecord("Message", "", TYPE_ID));
+        var dataToSend = Flux.just(kafkaSenderRecord("Message", "", KAFKA_TYPE_ID));
         sendDataToKafka(dataToSend);
 
         verifiedReceivedByConsumer("Message");
@@ -406,7 +406,7 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
         waitForKafkaListener();
 
-        var dataToSend = Flux.range(1, 3).map(i -> kafkaSenderRecord("Message_" + i, "", TYPE_ID)); // Message_1,
+        var dataToSend = Flux.range(1, 3).map(i -> kafkaSenderRecord("Message_" + i, "", KAFKA_TYPE_ID)); // Message_1,
         // Message_2
         // etc.
         sendDataToKafka(dataToSend);
@@ -428,7 +428,7 @@ class IntegrationWithKafka {
 
         String sendString = "testData " + Instant.now();
         String sendKey = "key " + Instant.now();
-        var dataToSend = Flux.just(kafkaSenderRecord(sendString, sendKey, TYPE_ID));
+        var dataToSend = Flux.just(kafkaSenderRecord(sendString, sendKey, KAFKA_TYPE_ID));
         sendDataToKafka(dataToSend);
 
         await().untilAsserted(() -> assertThat(kafkaReceiver.lastValue()).isEqualTo(sendString));
@@ -460,7 +460,7 @@ class IntegrationWithKafka {
 
         Instant startTime = Instant.now();
 
-        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord("Message_" + i, "", TYPE_ID)); // Message_1,
+        var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord("Message_" + i, "", KAFKA_TYPE_ID)); // Message_1,
         // etc.
         sendDataToKafka(dataToSend);
 
@@ -497,23 +497,18 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
         waitForKafkaListener();
 
-        final int NO_OF_OBJECTS = 5000;
+        final int NO_OF_OBJECTS = 50;
 
         Instant startTime = Instant.now();
 
         final String FILE_NAME = "pm_report.json.gz";
-
-        NewFileEvent event = NewFileEvent.builder() //
-                .filename(FILE_NAME) //
-                .build();
 
         DataStore fileStore = dataStore();
 
         fileStore.create(DataStore.Bucket.FILES).block();
         fileStore.copyFileTo(Path.of("./src/test/resources/" + FILE_NAME), FILE_NAME).block();
 
-        String eventAsString = gson.toJson(event);
-
+        String eventAsString = newFileEvent(FILE_NAME);
         var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord(eventAsString, "key", PM_TYPE_ID));
         sendDataToKafka(dataToSend);
 
@@ -550,10 +545,10 @@ class IntegrationWithKafka {
         final int NO_OF_JOBS = 150;
         ArrayList<KafkaReceiver> receivers = new ArrayList<>();
         for (int i = 0; i < NO_OF_JOBS; ++i) {
-            final String OUTPUT_TOPIC = "manyJobs_" + i;
-            this.icsSimulatorController.addJob(consumerJobInfoKafka(OUTPUT_TOPIC, filterData), OUTPUT_TOPIC,
+            final String outputTopic = "manyJobs_" + i;
+            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData), outputTopic,
                     restClient());
-            KafkaReceiver receiver = new KafkaReceiver(this.applicationConfig, OUTPUT_TOPIC, this.securityContext);
+            KafkaReceiver receiver = new KafkaReceiver(this.applicationConfig, outputTopic, this.securityContext);
             receivers.add(receiver);
         }
 
@@ -566,17 +561,12 @@ class IntegrationWithKafka {
 
         final String FILE_NAME = "pm_report.json.gz";
 
-        NewFileEvent event = NewFileEvent.builder() //
-                .filename(FILE_NAME) //
-                .build();
-
         DataStore fileStore = dataStore();
 
         fileStore.create(DataStore.Bucket.FILES).block();
         fileStore.copyFileTo(Path.of("./src/test/resources/" + FILE_NAME), FILE_NAME).block();
 
-        String eventAsString = gson.toJson(event);
-
+        String eventAsString = newFileEvent(FILE_NAME);
         var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord(eventAsString, "key", PM_TYPE_ID));
         sendDataToKafka(dataToSend);
 
@@ -589,21 +579,29 @@ class IntegrationWithKafka {
         logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
 
         for (KafkaReceiver receiver : receivers) {
-            assertThat(receiver.count).isEqualTo(NO_OF_OBJECTS);
-            // System.out.println("** " + receiver.OUTPUT_TOPIC + " " + receiver.count);
+            if (receiver.count != NO_OF_OBJECTS) {
+                System.out.println("** Unexpected" + receiver.OUTPUT_TOPIC + " " + receiver.count);
+            }
         }
 
         // printStatistics();
     }
 
+    private String newFileEvent(String fileName) {
+        NewFileEvent event = NewFileEvent.builder() //
+                .filename(fileName) //
+                .build();
+        return gson.toJson(event);
+    }
+
     private DataStore dataStore() {
-        return this.applicationConfig.isS3Enabled() ? new S3ObjectStore(applicationConfig)
-                : new FileStore(applicationConfig);
+        return DataStore.create(this.applicationConfig);
     }
 
     @Test
     void testHistoricalData() throws Exception {
         // test
+        waitForKafkaListener();
         final String JOB_ID = "testHistoricalData";
 
         DataStore fileStore = dataStore();
@@ -645,7 +643,7 @@ class IntegrationWithKafka {
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
 
-        var dataToSend = Flux.range(1, 100).map(i -> kafkaSenderRecord("XMessage_" + i, "", TYPE_ID)); // Message_1,
+        var dataToSend = Flux.range(1, 100).map(i -> kafkaSenderRecord("XMessage_" + i, "", KAFKA_TYPE_ID)); // Message_1,
         // Message_2
         // etc.
         sendDataToKafka(dataToSend); // this should not overflow
@@ -657,7 +655,7 @@ class IntegrationWithKafka {
         this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0, 1), JOB_ID2, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
-        dataToSend = Flux.just(kafkaSenderRecord("Howdy", "", TYPE_ID));
+        dataToSend = Flux.just(kafkaSenderRecord("Howdy", "", KAFKA_TYPE_ID));
         sendDataToKafka(dataToSend);
 
         verifiedReceivedByConsumerLast("Howdy");
