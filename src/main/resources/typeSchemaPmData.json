@@ -75,6 +75,9 @@
       "kafkaOutputTopic": {
          "type": "string"
       },
+      "gzip": {
+         "type": "boolean"
+      },
       "bufferTimeout": {
          "type": "object",
          "additionalProperties": false,

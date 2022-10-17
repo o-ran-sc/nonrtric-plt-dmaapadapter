@@ -23,9 +23,10 @@ package org.oran.dmaapadapter.tasks;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.repository.Job;
@@ -46,20 +47,23 @@ import reactor.kafka.sender.SenderRecord;
 public class KafkaJobDataDistributor extends JobDataDistributor {
     private static final Logger logger = LoggerFactory.getLogger(KafkaJobDataDistributor.class);
 
-    private KafkaSender<String, String> sender;
+    private KafkaSender<byte[], byte[]> sender;
     private final ApplicationConfig appConfig;
 
-    public KafkaJobDataDistributor(Job job, ApplicationConfig appConfig) {
-        super(job, appConfig);
+    public KafkaJobDataDistributor(Job job, ApplicationConfig appConfig, Flux<TopicListener.DataFromTopic> input) {
+        super(job, appConfig, input);
         this.appConfig = appConfig;
+        SenderOptions<byte[], byte[]> senderOptions = senderOptions(appConfig);
+        this.sender = KafkaSender.create(senderOptions);
     }
 
     @Override
     protected Mono<String> sendToClient(Filter.FilteredData data) {
         Job job = this.getJob();
-        SenderRecord<String, String, Integer> senderRecord = senderRecord(data, job);
+        SenderRecord<byte[], byte[], Integer> senderRecord = senderRecord(data, job);
 
-        logger.trace("Sending data '{}' to Kafka topic: {}", data, job.getParameters().getKafkaOutputTopic());
+        logger.trace("Sending data '{}' to Kafka topic: {}", StringUtils.truncate(data.getValueAString(), 10),
+                job.getParameters().getKafkaOutputTopic());
 
         return this.sender.send(Mono.just(senderRecord)) //
                 .doOnNext(n -> logger.debug("Sent data to Kafka topic: {}", job.getParameters().getKafkaOutputTopic())) //
@@ -67,14 +71,8 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
                         t -> logger.warn("Failed to send to Kafka, job: {}, reason: {}", job.getId(), t.getMessage())) //
                 .onErrorResume(t -> Mono.empty()) //
                 .collectList() //
-                .map(x -> data.value);
-    }
+                .map(x -> "ok");
 
-    @Override
-    public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
-        super.start(input);
-        SenderOptions<String, String> senderOptions = senderOptions(appConfig);
-        this.sender = KafkaSender.create(senderOptions);
     }
 
     @Override
@@ -86,18 +84,18 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
         }
     }
 
-    private static SenderOptions<String, String> senderOptions(ApplicationConfig config) {
+    private static SenderOptions<byte[], byte[]> senderOptions(ApplicationConfig config) {
         String bootstrapServers = config.getKafkaBootStrapServers();
 
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.ACKS_CONFIG, "all");
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
         return SenderOptions.create(props);
     }
 
-    private SenderRecord<String, String, Integer> senderRecord(Filter.FilteredData output, Job infoJob) {
+    private SenderRecord<byte[], byte[], Integer> senderRecord(Filter.FilteredData output, Job infoJob) {
         int correlationMetadata = 2;
         String topic = infoJob.getParameters().getKafkaOutputTopic();
         return SenderRecord.create(new ProducerRecord<>(topic, output.key, output.value), correlationMetadata);

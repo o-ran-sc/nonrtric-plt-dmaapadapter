@@ -32,17 +32,21 @@ public interface Filter {
 
     @ToString
     public static class FilteredData {
-        public final String key;
-        public final String value;
-        private static final FilteredData emptyData = new FilteredData("", "");
+        public final byte[] key;
+        public final byte[] value;
+        private static final FilteredData emptyData = new FilteredData(null, null);
 
         public boolean isEmpty() {
-            return value.isEmpty() && key.isEmpty();
+            return (key == null || key.length == 0) && (value == null || value.length == 0);
         }
 
-        public FilteredData(String key, String value) {
+        public FilteredData(byte[] key, byte[] value) {
             this.key = key;
             this.value = value;
+        }
+
+        public String getValueAString() {
+            return value == null ? "" : new String(this.value);
         }
 
         public static FilteredData empty() {

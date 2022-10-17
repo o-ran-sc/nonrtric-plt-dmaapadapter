@@ -44,7 +44,7 @@ class RegexpFilter implements Filter {
         if (regexp == null) {
             return new FilteredData(data.key, data.value);
         }
-        Matcher matcher = regexp.matcher(data.value);
+        Matcher matcher = regexp.matcher(data.valueAsString());
         boolean match = matcher.find();
         if (match) {
             return new FilteredData(data.key, data.value);

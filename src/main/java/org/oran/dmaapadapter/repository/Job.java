@@ -84,19 +84,20 @@ public class Job {
         @Builder.Default
         int noOfSentBytes = 0;
 
-        public void received(String str) {
-            noOfReceivedBytes += str.length();
+        public void received(byte[] bytes) {
+            noOfReceivedBytes += bytes.length;
             noOfReceivedObjects += 1;
 
         }
 
-        public void filtered(String str) {
-            noOfSentBytes += str.length();
+        public void filtered(byte[] bytes) {
+            noOfSentBytes += bytes.length;
             noOfSentObjects += 1;
         }
 
     }
 
+    @Builder
     public static class Parameters {
         public static final String REGEXP_TYPE = "regexp";
         public static final String PM_FILTER_TYPE = "pmdata";
@@ -104,9 +105,12 @@ public class Job {
         public static final String JSON_PATH_FILTER_TYPE = "json-path";
 
         @Setter
+        @Builder.Default
         private String filterType = REGEXP_TYPE;
+
         @Getter
         private Object filter;
+
         @Getter
         private BufferTimeout bufferTimeout;
 
@@ -115,19 +119,15 @@ public class Job {
         @Getter
         private String kafkaOutputTopic;
 
-        public Parameters() {}
-
-        public Parameters(Object filter, String filterType, BufferTimeout bufferTimeout, Integer maxConcurrency,
-                String kafkaOutputTopic) {
-            this.filter = filter;
-            this.bufferTimeout = bufferTimeout;
-            this.maxConcurrency = maxConcurrency;
-            this.filterType = filterType;
-            this.kafkaOutputTopic = kafkaOutputTopic;
-        }
+        @Getter
+        private Boolean gzip;
 
         public int getMaxConcurrency() {
-            return maxConcurrency == null || maxConcurrency == 0 ? 1 : maxConcurrency;
+            return maxConcurrency == null || maxConcurrency == 1 ? 1 : maxConcurrency;
+        }
+
+        public boolean isGzip() {
+            return gzip != null && gzip;
         }
 
         public Filter.Type getFilterType() {

@@ -27,12 +27,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
+import org.oran.dmaapadapter.filter.Filter.FilteredData;
 import org.oran.dmaapadapter.tasks.TopicListener;
 
 class PmReportFilterTest {
 
     private String filterReport(PmReportFilter filter) throws Exception {
-        return filter.filter(new TopicListener.DataFromTopic("", loadReport())).value;
+        TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes());
+        FilteredData filtered = filter.filter(data);
+        return filtered.getValueAString();
     }
 
     @Test
@@ -120,11 +123,11 @@ class PmReportFilterTest {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         PmReportFilter filter = new PmReportFilter(filterData);
 
-        String filtered = filter.filter(new TopicListener.DataFromTopic("", "junk")).value;
-        assertThat(filtered).isEmpty();
+        FilteredData filtered = filter.filter(new TopicListener.DataFromTopic(null, "junk".getBytes()));
+        assertThat(filtered.isEmpty()).isTrue();
 
-        filtered = filter.filter(new TopicListener.DataFromTopic("", reQuote("{'msg': 'test'}"))).value;
-        assertThat(filtered).isEmpty();
+        filtered = filter.filter(new TopicListener.DataFromTopic(null, reQuote("{'msg': 'test'}").getBytes()));
+        assertThat(filtered.isEmpty()).isTrue();
 
     }
 
