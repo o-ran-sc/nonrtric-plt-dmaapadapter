@@ -27,12 +27,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
+import org.oran.dmaapadapter.filter.Filter.FilteredData;
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 
 class JsltFilterTest {
 
     private String filterReport(JsltFilter filter) throws Exception {
-        return filter.filter(new DataFromTopic("", loadReport())).value;
+        DataFromTopic data = new DataFromTopic(null, loadReport().getBytes());
+        FilteredData filtered = filter.filter(data);
+        return filtered.getValueAString();
     }
 
     @Test

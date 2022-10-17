@@ -20,7 +20,6 @@
 
 package org.oran.dmaapadapter.tasks;
 
-import java.nio.charset.StandardCharsets;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -33,22 +32,23 @@ public interface TopicListener {
 
     @ToString
     public static class DataFromTopic {
-        public final String key;
-        public final String value;
+        public final byte[] key;
+        public final byte[] value;
+
+        private static byte[] noBytes = new byte[0];
 
         @Getter
         @Setter
         @ToString.Exclude
         private PmReport cachedPmReport;
 
-        public DataFromTopic(String key, String value) {
-            this.key = key;
-            this.value = value;
+        public DataFromTopic(byte[] key, byte[] value) {
+            this.key = key == null ? noBytes : key;
+            this.value = value == null ? noBytes : value;
         }
 
-        public DataFromTopic(String key, byte[] value) {
-            this.key = key;
-            this.value = new String(value, StandardCharsets.UTF_8);
+        public String valueAsString() {
+            return new String(this.value);
         }
 
     }

@@ -96,7 +96,7 @@ public class PmReportFilter implements Filter {
             if (!filter(report, this.filterData)) {
                 return FilteredData.empty();
             }
-            return new FilteredData(data.key, gson.toJson(report));
+            return new FilteredData(data.key, gson.toJson(report).getBytes());
         } catch (Exception e) {
             logger.warn("Could not parse PM data. {}, reason: {}", data, e.getMessage());
             return FilteredData.empty();
@@ -107,7 +107,7 @@ public class PmReportFilter implements Filter {
     private PmReport createPmReport(DataFromTopic data) {
         synchronized (data) {
             if (data.getCachedPmReport() == null) {
-                data.setCachedPmReport(gsonParse.fromJson(data.value, PmReport.class));
+                data.setCachedPmReport(gsonParse.fromJson(data.valueAsString(), PmReport.class));
             }
             return data.getCachedPmReport();
         }

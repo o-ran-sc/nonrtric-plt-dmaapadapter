@@ -60,7 +60,7 @@ class JsltFilter implements Filter {
             if (filteredNode == NullNode.instance) {
                 return FilteredData.empty();
             }
-            return new FilteredData(data.key, mapper.writeValueAsString(filteredNode));
+            return new FilteredData(data.key, mapper.writeValueAsBytes(filteredNode));
         } catch (Exception e) {
             return FilteredData.empty();
         }

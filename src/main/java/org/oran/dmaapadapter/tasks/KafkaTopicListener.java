@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.datastore.DataStore;
 import org.oran.dmaapadapter.repository.InfoType;
@@ -39,7 +39,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.kafka.receiver.KafkaReceiver;
 import reactor.kafka.receiver.ReceiverOptions;
-
 
 /**
  * The class streams incoming requests from a Kafka topic and sends them further
@@ -74,42 +73,40 @@ public class KafkaTopicListener implements TopicListener {
         return KafkaReceiver.create(kafkaInputProperties(clientId)) //
                 .receiveAutoAck() //
                 .concatMap(consumerRecord -> consumerRecord) //
-                .doOnNext(input -> logger.trace("Received from kafka topic: {} :{}", this.type.getKafkaInputTopic(),
-                        input.value())) //
+                .doOnNext(input -> logger.trace("Received from kafka topic: {}", this.type.getKafkaInputTopic())) //
                 .doOnError(t -> logger.error("KafkaTopicReceiver error: {}", t.getMessage())) //
                 .doFinally(sig -> logger.error("KafkaTopicReceiver stopped, reason: {}", sig)) //
-                .filter(t -> !t.value().isEmpty() || !t.key().isEmpty()) //
+                .filter(t -> t.value().length > 0 || t.key().length > 0) //
                 .map(input -> new DataFromTopic(input.key(), input.value())) //
-                .flatMap(data -> getDataFromFileIfNewPmFileEvent(data, type, dataStore), 100) //
-                .publish() //
+                .flatMap(data -> getDataFromFileIfNewPmFileEvent(data, type, dataStore), 100).publish() //
                 .autoConnect(1);
     }
 
-    private ReceiverOptions<String, String> kafkaInputProperties(String clientId) {
+    private ReceiverOptions<byte[], byte[]> kafkaInputProperties(String clientId) {
         Map<String, Object> consumerProps = new HashMap<>();
         if (this.applicationConfig.getKafkaBootStrapServers().isEmpty()) {
             logger.error("No kafka boostrap server is setup");
         }
         consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, this.applicationConfig.getKafkaBootStrapServers());
         consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, this.type.getKafkaGroupId());
-        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
+        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
         consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
         consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId);
         consumerProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, this.applicationConfig.getKafkaMaxPollRecords());
 
-        return ReceiverOptions.<String, String>create(consumerProps)
+        return ReceiverOptions.<byte[], byte[]>create(consumerProps)
                 .subscription(Collections.singleton(this.type.getKafkaInputTopic()));
     }
 
     public static Mono<DataFromTopic> getDataFromFileIfNewPmFileEvent(DataFromTopic data, InfoType type,
             DataStore fileStore) {
-        if (type.getDataType() != InfoType.DataType.PM_DATA || data.value.length() > 1000) {
+        if (type.getDataType() != InfoType.DataType.PM_DATA || data.value.length > 1000) {
             return Mono.just(data);
         }
 
         try {
-            NewFileEvent ev = gson.fromJson(data.value, NewFileEvent.class);
+            NewFileEvent ev = gson.fromJson(data.valueAsString(), NewFileEvent.class);
 
             if (ev.getFilename() == null) {
                 logger.warn("Ignoring received message: {}", data);

@@ -93,16 +93,19 @@ public class TopicListeners {
         }
     }
 
-    private JobDataDistributor createConsumer(Job job) {
-        return !Strings.isEmpty(job.getParameters().getKafkaOutputTopic()) ? new KafkaJobDataDistributor(job, appConfig)
-                : new HttpJobDataDistributor(job, appConfig);
+    private JobDataDistributor createConsumer(Job job, TopicListener topicListener) {
+        return !Strings.isEmpty(job.getParameters().getKafkaOutputTopic())
+                ? new KafkaJobDataDistributor(job, appConfig, topicListener.getFlux())
+                : new HttpJobDataDistributor(job, appConfig, topicListener.getFlux());
     }
 
     private void addConsumer(Job job, MultiMap<JobDataDistributor> distributors,
             Map<String, TopicListener> topicListeners) {
         TopicListener topicListener = topicListeners.get(job.getType().getId());
-        JobDataDistributor distributor = createConsumer(job);
-        distributor.start(topicListener.getFlux());
+        JobDataDistributor distributor = createConsumer(job, topicListener);
+
+        distributor.collectHistoricalData();
+
         distributors.put(job.getType().getId(), job.getId(), distributor);
     }
 

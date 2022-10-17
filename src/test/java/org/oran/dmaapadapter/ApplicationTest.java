@@ -63,10 +63,8 @@ import org.oran.dmaapadapter.r1.ProducerJobInfo;
 import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
-import org.oran.dmaapadapter.tasks.JobDataDistributor;
 import org.oran.dmaapadapter.tasks.NewFileEvent;
 import org.oran.dmaapadapter.tasks.ProducerRegstrationTask;
-import org.oran.dmaapadapter.tasks.TopicListener;
 import org.oran.dmaapadapter.tasks.TopicListeners;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +82,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -392,38 +389,6 @@ class ApplicationTest {
     }
 
     @Test
-    void testReceiveAndPostDataFromKafka() throws Exception {
-        final String JOB_ID = "ID";
-        final String TYPE_ID = "PmDataOverKafka";
-        waitForRegistration();
-
-        // Create a job
-        Job.Parameters param = new Job.Parameters(null, null, new Job.BufferTimeout(123, 456), 1, null);
-        String targetUri = baseUrl() + ConsumerController.CONSUMER_TARGET_URL;
-        ConsumerJobInfo kafkaJobInfo = new ConsumerJobInfo(TYPE_ID, toJson(gson.toJson(param)), "owner", targetUri, "");
-
-        this.icsSimulatorController.addJob(kafkaJobInfo, JOB_ID, restClient());
-        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
-
-        JobDataDistributor kafkaConsumer = this.topicListeners.getDataDistributors().get(TYPE_ID, JOB_ID);
-
-        // Handle received data from Kafka, check that it has been posted to the
-        // consumer
-        kafkaConsumer.start(Flux.just(new TopicListener.DataFromTopic("key", "data")));
-
-        ConsumerController.TestResults consumer = this.consumerController.testResults;
-        await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
-        assertThat(consumer.receivedBodies.get(0)).isEqualTo("[data]");
-        assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "application/json");
-
-        // This only works in debugger. Removed for now.
-        assertThat(this.icsSimulatorController.testResults.createdJob).isNotNull();
-        assertThat(this.icsSimulatorController.testResults.createdJob.infoTypeId)
-                .isEqualTo("xml-file-data-to-filestore");
-
-    }
-
-    @Test
     void testReceiveAndPostDataFromDmaapBuffering() throws Exception {
         final String JOB_ID = "testReceiveAndPostDataFromDmaap";
 
@@ -431,7 +396,8 @@ class ApplicationTest {
         waitForRegistration();
 
         // Create a job
-        Job.Parameters param = new Job.Parameters(null, null, new Job.BufferTimeout(123, 456), 1, null);
+        Job.Parameters param = Job.Parameters.builder().bufferTimeout(new Job.BufferTimeout(123, 456)).build();
+
         ConsumerJobInfo jobInfo = consumerJobInfo("DmaapInformationType", JOB_ID, toJson(gson.toJson(param)));
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
@@ -457,7 +423,7 @@ class ApplicationTest {
         waitForRegistration();
 
         // Create a job
-        Job.Parameters param = new Job.Parameters(null, null, null, 1, null);
+        Job.Parameters param = Job.Parameters.builder().build();
         ConsumerJobInfo jobInfo = consumerJobInfo("DmaapInformationType", JOB_ID, toJson(gson.toJson(param)));
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
@@ -500,8 +466,8 @@ class ApplicationTest {
         filterData.getMeasObjInstIds().add("UtranCell=Gbg-997");
         filterData.getSourceNames().add("O-DU-1122");
         filterData.getMeasuredEntityDns().add("ManagedElement=RNC-Gbg-1");
-        Job.Parameters param = new Job.Parameters(filterData, Job.Parameters.PM_FILTER_TYPE,
-                new Job.BufferTimeout(123, 456), null, null);
+        Job.Parameters param = Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE)
+                .bufferTimeout(new Job.BufferTimeout(123, 456)).build();
         String paramJson = gson.toJson(param);
         ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverRest", "EI_PM_JOB_ID", toJson(paramJson));
 
@@ -540,14 +506,15 @@ class ApplicationTest {
 
         DataStore fileStore = DataStore.create(this.applicationConfig);
         fileStore.copyFileTo(Path.of("./src/test/resources/pm_report.json"),
-                "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json").block();
+                "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.json").block();
 
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.getSourceNames().add("O-DU-1122");
         filterData.setPmRopStartTime("1999-12-27T10:50:44.000-08:00");
 
-        Job.Parameters param = new Job.Parameters(filterData, Job.Parameters.PM_FILTER_TYPE,
-                new Job.BufferTimeout(123, 456), null, null);
+        Job.Parameters param = Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE)
+                .bufferTimeout(new Job.BufferTimeout(123, 456)).build();
+
         String paramJson = gson.toJson(param);
         ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverRest", "EI_PM_JOB_ID", toJson(paramJson));
 
@@ -569,7 +536,8 @@ class ApplicationTest {
         // Create a job with a PM filter
         String expresssion = "if(.event.commonEventHeader.sourceName == \"O-DU-1122\")" //
                 + ".";
-        Job.Parameters param = new Job.Parameters(expresssion, Job.Parameters.JSLT_FILTER_TYPE, null, null, null);
+        Job.Parameters param =
+                Job.Parameters.builder().filter(expresssion).filterType(Job.Parameters.JSLT_FILTER_TYPE).build();
         String paramJson = gson.toJson(param);
         ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverRest", JOB_ID, toJson(paramJson));
 
@@ -669,7 +637,9 @@ class ApplicationTest {
         // Create a job with a PM filter
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.getMeasTypes().add("succImmediateAssignProcs");
-        Job.Parameters param = new Job.Parameters(filterData, Job.Parameters.PM_FILTER_TYPE, null, null, null);
+        Job.Parameters param =
+                Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE).build();
+
         String paramJson = gson.toJson(param);
 
         ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverKafka", "EI_PM_JOB_ID", toJson(paramJson));

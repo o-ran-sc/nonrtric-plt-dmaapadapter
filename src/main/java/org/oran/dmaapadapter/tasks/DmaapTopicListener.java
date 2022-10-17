@@ -72,7 +72,7 @@ public class DmaapTopicListener implements TopicListener {
                 .doOnNext(input -> logger.debug("Received from DMaap: {} :{}", this.type.getDmaapTopicUrl(), input)) //
                 .doOnError(t -> logger.error("DmaapTopicListener error: {}", t.getMessage())) //
                 .doFinally(sig -> logger.error("DmaapTopicListener stopped, reason: {}", sig)) //
-                .map(input -> new DataFromTopic("", input))
+                .map(input -> new DataFromTopic(null, input.getBytes()))
                 .flatMap(data -> KafkaTopicListener.getDataFromFileIfNewPmFileEvent(data, type, dataStore), 100)
                 .publish() //
                 .autoConnect();

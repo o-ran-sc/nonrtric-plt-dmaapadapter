@@ -20,9 +20,12 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.util.zip.GZIPOutputStream;
 
 import lombok.Getter;
 
@@ -84,16 +87,12 @@ public abstract class JobDataDistributor {
         }
     }
 
-    protected JobDataDistributor(Job job, ApplicationConfig applConfig) {
+    protected JobDataDistributor(Job job, ApplicationConfig applConfig, Flux<TopicListener.DataFromTopic> input) {
         this.job = job;
         this.applConfig = applConfig;
         this.dataStore = DataStore.create(applConfig);
         this.dataStore.create(DataStore.Bucket.FILES).subscribe();
         this.dataStore.create(DataStore.Bucket.LOCKS).subscribe();
-    }
-
-    public synchronized void start(Flux<TopicListener.DataFromTopic> input) {
-        collectHistoricalData();
 
         this.errorStats.resetIrrecoverableErrors();
         this.subscription = filterAndBuffer(input, this.job) //
@@ -110,7 +109,7 @@ public abstract class JobDataDistributor {
         }
     }
 
-    private void collectHistoricalData() {
+    public void collectHistoricalData() {
         PmReportFilter filter = job.getFilter() instanceof PmReportFilter ? (PmReportFilter) job.getFilter() : null;
 
         if (filter != null && filter.getFilterData().getPmRopStartTime() != null) {
@@ -129,9 +128,25 @@ public abstract class JobDataDistributor {
                     .flatMap(data -> KafkaTopicListener.getDataFromFileIfNewPmFileEvent(data, this.job.getType(),
                             dataStore), 100)
                     .map(job::filter) //
+                    .map(this::gzip) //
                     .flatMap(this::sendToClient, 1) //
                     .onErrorResume(this::handleCollectHistoricalDataError) //
                     .subscribe();
+        }
+    }
+
+    private Filter.FilteredData gzip(Filter.FilteredData data) {
+        if (job.getParameters().isGzip()) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzip = new GZIPOutputStream(out)) {
+                gzip.write(data.value);
+                return new Filter.FilteredData(data.key, out.toByteArray());
+            } catch (IOException e) {
+                logger.error("Unexpected exception when zipping: {}", e.getMessage());
+                return data;
+            }
+        } else {
+            return data;
         }
     }
 
@@ -140,6 +155,7 @@ public abstract class JobDataDistributor {
             logger.debug("Locked exception: {} job: {}", t.getMessage(), job.getId());
             return Mono.empty(); // Ignore
         } else {
+            logger.error("Exception: {} job: {}", t.getMessage(), job.getId());
             return tryDeleteLockFile() //
                     .map(bool -> "OK");
         }
@@ -153,11 +169,11 @@ public abstract class JobDataDistributor {
 
         NewFileEvent ev = new NewFileEvent(fileName);
 
-        return new TopicListener.DataFromTopic("", gson.toJson(ev));
+        return new TopicListener.DataFromTopic(null, gson.toJson(ev).getBytes());
     }
 
     private boolean filterStartTime(String startTimeStr, String fileName) {
-        // A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json
+        // A20000626.2315+0200-2330+0200_HTTPS-6-73.json
         try {
             if (fileName.endsWith(".json") || fileName.endsWith(".json.gz")) {
 
@@ -212,15 +228,16 @@ public abstract class JobDataDistributor {
         Flux<Filter.FilteredData> filtered = //
                 inputFlux.doOnNext(data -> job.getStatistics().received(data.value)) //
                         .map(job::filter) //
+                        .map(this::gzip) //
                         .filter(f -> !f.isEmpty()) //
                         .doOnNext(f -> job.getStatistics().filtered(f.value)); //
 
         if (job.isBuffered()) {
-            filtered = filtered.map(input -> quoteNonJson(input.value, job)) //
+            filtered = filtered.map(input -> quoteNonJson(input.getValueAString(), job)) //
                     .bufferTimeout( //
                             job.getParameters().getBufferTimeout().getMaxSize(), //
                             job.getParameters().getBufferTimeout().getMaxTime()) //
-                    .map(buffered -> new Filter.FilteredData("", buffered.toString()));
+                    .map(buffered -> new Filter.FilteredData(null, buffered.toString().getBytes()));
         }
         return filtered;
     }

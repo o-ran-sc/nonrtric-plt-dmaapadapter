@@ -36,7 +36,7 @@ import java.util.Map;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -194,16 +194,15 @@ class IntegrationWithKafka {
         }
 
         synchronized String lastKey() {
-            return this.receivedKafkaOutput.key;
+            return new String(this.receivedKafkaOutput.key);
         }
 
         synchronized String lastValue() {
-            return this.receivedKafkaOutput.value;
+            return new String(this.receivedKafkaOutput.value);
         }
 
         void reset() {
-            count = 0;
-            this.receivedKafkaOutput = new TopicListener.DataFromTopic("", "");
+            this.receivedKafkaOutput = new TopicListener.DataFromTopic(null, null);
         }
     }
 
@@ -272,7 +271,9 @@ class IntegrationWithKafka {
     private static Object jobParametersAsJsonObject(String filter, long maxTimeMiliseconds, int maxSize,
             int maxConcurrency) {
         Job.BufferTimeout buffer = maxSize > 0 ? new Job.BufferTimeout(maxSize, maxTimeMiliseconds) : null;
-        Job.Parameters param = new Job.Parameters(filter, Job.Parameters.REGEXP_TYPE, buffer, maxConcurrency, null);
+        Job.Parameters param = Job.Parameters.builder().filter(filter).filterType(Job.Parameters.REGEXP_TYPE)
+                .bufferTimeout(buffer).maxConcurrency(maxConcurrency).build();
+
         String str = gson.toJson(param);
         return jsonObject(str);
     }
@@ -296,9 +297,10 @@ class IntegrationWithKafka {
         }
     }
 
-    ConsumerJobInfo consumerJobInfoKafka(String topic, PmReportFilter.FilterData filterData) {
+    ConsumerJobInfo consumerJobInfoKafka(String topic, PmReportFilter.FilterData filterData, boolean gzip) {
         try {
-            Job.Parameters param = new Job.Parameters(filterData, Job.Parameters.PM_FILTER_TYPE, null, 1, topic);
+            Job.Parameters param = Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE)
+                    .kafkaOutputTopic(topic).gzip(gzip).build();
 
             String str = gson.toJson(param);
             Object parametersObj = jsonObject(str);
@@ -309,9 +311,13 @@ class IntegrationWithKafka {
         }
     }
 
+    ConsumerJobInfo consumerJobInfoKafka(String topic, PmReportFilter.FilterData filterData) {
+        return consumerJobInfoKafka(topic, filterData, false);
+    }
+
     ConsumerJobInfo consumerJobInfoKafka(String topic) {
         try {
-            Job.Parameters param = new Job.Parameters(null, null, null, 1, topic);
+            Job.Parameters param = Job.Parameters.builder().kafkaOutputTopic(topic).build();
             String str = gson.toJson(param);
             Object parametersObj = jsonObject(str);
 
@@ -321,26 +327,27 @@ class IntegrationWithKafka {
         }
     }
 
-    private SenderOptions<String, String> kafkaSenderOptions() {
+    private SenderOptions<byte[], byte[]> kafkaSenderOptions() {
         String bootstrapServers = this.applicationConfig.getKafkaBootStrapServers();
 
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         // props.put(ProducerConfig.CLIENT_ID_CONFIG, "sample-producerx");
         props.put(ProducerConfig.ACKS_CONFIG, "all");
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
         return SenderOptions.create(props);
     }
 
-    private SenderRecord<String, String, Integer> kafkaSenderRecord(String data, String key, String typeId) {
+    private SenderRecord<byte[], byte[], Integer> kafkaSenderRecord(String data, String key, String typeId) {
         final InfoType infoType = this.types.get(typeId);
         int correlationMetadata = 2;
-        return SenderRecord.create(new ProducerRecord<>(infoType.getKafkaInputTopic(), key, data), correlationMetadata);
+        return SenderRecord.create(new ProducerRecord<>(infoType.getKafkaInputTopic(), key.getBytes(), data.getBytes()),
+                correlationMetadata);
     }
 
-    private void sendDataToKafka(Flux<SenderRecord<String, String, Integer>> dataToSend) {
-        final KafkaSender<String, String> sender = KafkaSender.create(kafkaSenderOptions());
+    private void sendDataToKafka(Flux<SenderRecord<byte[], byte[], Integer>> dataToSend) {
+        final KafkaSender<byte[], byte[]> sender = KafkaSender.create(kafkaSenderOptions());
 
         sender.send(dataToSend) //
                 .doOnError(e -> logger.error("Send failed", e)) //
@@ -440,7 +447,7 @@ class IntegrationWithKafka {
     private void printStatistics() {
         String targetUri = baseUrl() + ProducerCallbacksController.STATISTICS_URL;
         String stats = restClient().get(targetUri).block();
-        logger.info("Stats : {}", stats);
+        logger.info("Stats : {}", org.apache.commons.lang3.StringUtils.truncate(stats, 1000));
     }
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
@@ -539,14 +546,15 @@ class IntegrationWithKafka {
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.getMeasTypes().add("succImmediateAssignProcs");
-        filterData.getMeasObjClass().add("UtranCell");
+        filterData.getMeasTypes().add("pmAnrNcgiMeasFailUeCap");
+        filterData.getMeasTypes().add("pmAnrNcgiMeasRcvDrx");
+        filterData.getMeasObjInstIds().add("ManagedElement=seliitdus00487,GNBCUCPFunction=1,NRCellCU=32");
 
         final int NO_OF_JOBS = 150;
         ArrayList<KafkaReceiver> receivers = new ArrayList<>();
         for (int i = 0; i < NO_OF_JOBS; ++i) {
             final String outputTopic = "manyJobs_" + i;
-            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData), outputTopic,
+            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData, false), outputTopic,
                     restClient());
             KafkaReceiver receiver = new KafkaReceiver(this.applicationConfig, outputTopic, this.securityContext);
             receivers.add(receiver);
@@ -555,14 +563,15 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(NO_OF_JOBS));
         waitForKafkaListener();
 
-        final int NO_OF_OBJECTS = 500;
+        final int NO_OF_OBJECTS = 1000;
 
         Instant startTime = Instant.now();
 
-        final String FILE_NAME = "pm_report.json.gz";
+        final String FILE_NAME = "A20000626.2315+0200-2330+0200_HTTPS-6-73.json.gz";
 
         DataStore fileStore = dataStore();
 
+        fileStore.deleteBucket(DataStore.Bucket.FILES).block();
         fileStore.create(DataStore.Bucket.FILES).block();
         fileStore.copyFileTo(Path.of("./src/test/resources/" + FILE_NAME), FILE_NAME).block();
 
@@ -571,8 +580,8 @@ class IntegrationWithKafka {
         sendDataToKafka(dataToSend);
 
         while (receivers.get(0).count != NO_OF_OBJECTS) {
-            logger.info("sleeping {}", kafkaReceiver.count);
-            Thread.sleep(1000 * 1);
+            // logger.info("sleeping {}", kafkaReceiver.count);
+            Thread.sleep(100 * 1);
         }
 
         final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
@@ -584,7 +593,7 @@ class IntegrationWithKafka {
             }
         }
 
-        // printStatistics();
+        printStatistics();
     }
 
     private String newFileEvent(String fileName) {
@@ -601,16 +610,16 @@ class IntegrationWithKafka {
     @Test
     void testHistoricalData() throws Exception {
         // test
-        waitForKafkaListener();
         final String JOB_ID = "testHistoricalData";
 
         DataStore fileStore = dataStore();
 
+        fileStore.deleteBucket(DataStore.Bucket.FILES).block();
         fileStore.create(DataStore.Bucket.FILES).block();
         fileStore.create(DataStore.Bucket.LOCKS).block();
 
         fileStore.copyFileTo(Path.of("./src/test/resources/pm_report.json"),
-                "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json").block();
+                "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.json").block();
 
         fileStore.copyFileTo(Path.of("./src/test/resources/pm_report.json"), "OTHER_SOURCENAME/test.json").block();
 
@@ -624,7 +633,7 @@ class IntegrationWithKafka {
                 restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
-        await().untilAsserted(() -> assertThat(kafkaReceiver.count).isEqualTo(1));
+        await().untilAsserted(() -> assertThat(kafkaReceiver.count).isPositive());
     }
 
     @Test
