@@ -122,7 +122,7 @@ public class KafkaTopicListener implements TopicListener {
         }
     }
 
-    private static byte[] unzip(byte[] bytes, String fileName) {
+    static byte[] unzip(byte[] bytes, String fileName) {
         if (!fileName.endsWith(".gz")) {
             return bytes;
         }
@@ -134,7 +134,6 @@ public class KafkaTopicListener implements TopicListener {
             logger.error("Error while decompression, file: {}, reason: {}", fileName, e.getMessage());
             return new byte[0];
         }
-
     }
 
 }
