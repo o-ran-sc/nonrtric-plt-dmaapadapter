@@ -546,9 +546,9 @@ class IntegrationWithKafka {
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.getMeasTypes().add("pmAnrNcgiMeasFailUeCap");
-        filterData.getMeasTypes().add("pmAnrNcgiMeasRcvDrx");
-        filterData.getMeasObjInstIds().add("ManagedElement=seliitdus00487,GNBCUCPFunction=1,NRCellCU=32");
+        filterData.getMeasTypes().add("pmCounterNumber0");
+        filterData.getMeasTypes().add("pmCounterNumber1");
+        filterData.getMeasObjClass().add("NRCellCU");
 
         final int NO_OF_JOBS = 150;
         ArrayList<KafkaReceiver> receivers = new ArrayList<>();
@@ -580,8 +580,8 @@ class IntegrationWithKafka {
         sendDataToKafka(dataToSend);
 
         while (receivers.get(0).count != NO_OF_OBJECTS) {
-            // logger.info("sleeping {}", kafkaReceiver.count);
-            Thread.sleep(100 * 1);
+            logger.info("sleeping {}", kafkaReceiver.count);
+            Thread.sleep(1000 * 1);
         }
 
         final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();

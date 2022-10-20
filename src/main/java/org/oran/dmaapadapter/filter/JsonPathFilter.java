@@ -28,13 +28,13 @@ import org.slf4j.LoggerFactory;
 
 class JsonPathFilter implements Filter {
 
-    private String expression;
+    private JsonPath expression;
     private static final Logger logger = LoggerFactory.getLogger(JsonPathFilter.class);
     com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
 
     public JsonPathFilter(String exp) {
         try {
-            expression = exp;
+            expression = JsonPath.compile(exp);
         } catch (Exception e) {
             logger.warn("Could not parse Json Path expression: {}, reason: {}", exp, e.getMessage());
         }

@@ -137,10 +137,14 @@ public abstract class JobDataDistributor {
 
     private Filter.FilteredData gzip(Filter.FilteredData data) {
         if (job.getParameters().isGzip()) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            try (GZIPOutputStream gzip = new GZIPOutputStream(out)) {
+            try {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                GZIPOutputStream gzip = new GZIPOutputStream(out);
                 gzip.write(data.value);
-                return new Filter.FilteredData(data.key, out.toByteArray());
+                gzip.flush();
+                gzip.close();
+                byte[] zipped = out.toByteArray();
+                return new Filter.FilteredData(data.key, zipped);
             } catch (IOException e) {
                 logger.error("Unexpected exception when zipping: {}", e.getMessage());
                 return data;
