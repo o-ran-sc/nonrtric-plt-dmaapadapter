@@ -87,16 +87,18 @@ public class PmReportFilter implements Filter {
     @Override
     public FilteredData filter(DataFromTopic data) {
         try {
-            PmReport report = createPmReport(data);
+            PmReport report = getPmReport(data);
+            PmReport reportFiltered = new PmReport();
+
             if (report.event.perf3gppFields == null) {
                 logger.warn("Received PM report with no perf3gppFields, ignored. {}", data);
                 return FilteredData.empty();
             }
 
-            if (!filter(report, this.filterData)) {
+            if (!filter(report, reportFiltered, this.filterData)) {
                 return FilteredData.empty();
             }
-            return new FilteredData(data.key, gson.toJson(report).getBytes());
+            return new FilteredData(data.key, gson.toJson(reportFiltered).getBytes());
         } catch (Exception e) {
             logger.warn("Could not parse PM data. {}, reason: {}", data, e.getMessage());
             return FilteredData.empty();
@@ -104,7 +106,7 @@ public class PmReportFilter implements Filter {
     }
 
     @SuppressWarnings("java:S2445") // "data" is a method parameter, and should not be used for synchronization.
-    private PmReport createPmReport(DataFromTopic data) {
+    private PmReport getPmReport(DataFromTopic data) {
         synchronized (data) {
             if (data.getCachedPmReport() == null) {
                 data.setCachedPmReport(gsonParse.fromJson(data.valueAsString(), PmReport.class));
@@ -120,13 +122,18 @@ public class PmReportFilter implements Filter {
      * @param filterData
      * @return true if there is anything left in the report
      */
-    private boolean filter(PmReport report, FilterData filterData) {
+    private boolean filter(PmReport report, PmReport reportFiltered, FilterData filterData) {
         if (!matchSourceNames(report, filterData.sourceNames)) {
             return false;
         }
-        Collection<PmReport.MeasInfoList> filtered = createMeasObjInstIds(report, filterData);
-        report.event.perf3gppFields.measDataCollection.measInfoList = filtered;
-        return !filtered.isEmpty();
+
+        Collection<PmReport.MeasInfoList> filteredMeasObjs = createMeasObjInstIds(report, filterData);
+        reportFiltered.event.commonEventHeader = report.event.commonEventHeader;
+        reportFiltered.event.perf3gppFields = report.event.perf3gppFields.toBuilder().build();
+        reportFiltered.event.perf3gppFields.measDataCollection =
+                report.event.perf3gppFields.measDataCollection.toBuilder().build();
+        reportFiltered.event.perf3gppFields.measDataCollection.measInfoList = filteredMeasObjs;
+        return !filteredMeasObjs.isEmpty();
     }
 
     private boolean isContainedInAny(String aString, Collection<String> collection) {

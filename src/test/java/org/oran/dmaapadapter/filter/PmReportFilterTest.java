@@ -22,15 +22,23 @@ package org.oran.dmaapadapter.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import java.lang.invoke.MethodHandles;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
 import org.oran.dmaapadapter.filter.Filter.FilteredData;
 import org.oran.dmaapadapter.tasks.TopicListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class PmReportFilterTest {
+    private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     private String filterReport(PmReportFilter filter) throws Exception {
         TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes());
@@ -75,17 +83,27 @@ class PmReportFilterTest {
 
     @Test
     void testMeasObjClass() throws Exception {
-        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.measObjClass.add("junk");
-        PmReportFilter filter = new PmReportFilter(filterData);
-        String filtered = filterReport(filter);
-        assertThat(filtered).isEmpty();
+        {
+            PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+            filterData.measObjClass.add("junk");
+            PmReportFilter filter = new PmReportFilter(filterData);
+            String filtered = filterReport(filter);
+            assertThat(filtered).isEmpty();
+        }
 
-        filterData = new PmReportFilter.FilterData();
-        filterData.measObjClass.add("ENodeBFunction");
-        filter = new PmReportFilter(filterData);
-        filtered = filterReport(filter);
-        assertThat(filtered).contains("ENodeBFunction").doesNotContain("UtranCell");
+        {
+            TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes());
+
+            PmReportFilter.FilterData utranCellFilter = new PmReportFilter.FilterData();
+            utranCellFilter.measObjClass.add("UtranCell");
+            FilteredData filtered = new PmReportFilter(utranCellFilter).filter(data);
+            assertThat(filtered.getValueAString()).contains("UtranCell").doesNotContain("ENodeBFunction");
+
+            PmReportFilter.FilterData eNodeBFilter = new PmReportFilter.FilterData();
+            eNodeBFilter.measObjClass.add("ENodeBFunction");
+            filtered = new PmReportFilter(eNodeBFilter).filter(data);
+            assertThat(filtered.getValueAString()).contains("ENodeBFunction").doesNotContain("UtranCell");
+        }
     }
 
     @Test
@@ -101,6 +119,42 @@ class PmReportFilterTest {
         filter = new PmReportFilter(filterData);
         filtered = filterReport(filter);
         assertThat(filtered).contains("O-DU-1122");
+    }
+
+    void testCharacteristics() throws Exception {
+        Gson gson = new GsonBuilder() //
+                .disableHtmlEscaping() //
+                .create(); //
+
+        String path = "./src/test/resources/A20000626.2315+0200-2330+0200_HTTPS-6-73.json";
+        String report = Files.readString(Path.of(path), Charset.defaultCharset());
+
+        TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, report.getBytes());
+
+        Instant startTime = Instant.now();
+
+        int CNT = 100000;
+        for (int i = 0; i < CNT; ++i) {
+            gson.fromJson(data.valueAsString(), PmReport.class);
+        }
+        printDuration("Parse", startTime, CNT);
+
+        startTime = Instant.now();
+
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+        filterData.measTypes.add("pmCounterNumber0");
+        PmReportFilter filter = new PmReportFilter(filterData);
+        for (int i = 0; i < CNT; ++i) {
+            FilteredData filtered = filter.filter(data);
+        }
+
+        printDuration("Filter", startTime, CNT);
+    }
+
+    void printDuration(String str, Instant startTime, int noOfIterations) {
+        final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
+        logger.info("*** Duration " + str + " :" + durationSeconds + ", objects/second: "
+                + noOfIterations / durationSeconds);
     }
 
     @Test

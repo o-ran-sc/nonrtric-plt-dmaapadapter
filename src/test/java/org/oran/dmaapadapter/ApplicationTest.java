@@ -33,6 +33,7 @@ import com.google.protobuf.util.JsonFormat;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -124,7 +125,7 @@ class ApplicationTest {
     @LocalServerPort
     int localServerHttpPort;
 
-    private final Logger logger = LoggerFactory.getLogger(ApplicationTest.class);
+    private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     public static class ProtoJsonUtil {
 

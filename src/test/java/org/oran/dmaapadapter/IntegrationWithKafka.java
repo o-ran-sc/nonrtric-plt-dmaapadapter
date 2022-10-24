@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonParser;
 
+import java.lang.invoke.MethodHandles;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -164,7 +165,7 @@ class IntegrationWithKafka {
     private static class KafkaReceiver {
         public final String OUTPUT_TOPIC;
         private TopicListener.DataFromTopic receivedKafkaOutput;
-        private final Logger logger = LoggerFactory.getLogger(IntegrationWithKafka.class);
+        private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
         int count = 0;
 

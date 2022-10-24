@@ -25,6 +25,8 @@ import com.google.gson.annotations.Expose;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import lombok.Builder;
+
 public class PmReport {
 
     @Expose
@@ -129,6 +131,7 @@ public class PmReport {
         }
     }
 
+    @Builder(toBuilder = true)
     public static class MeasDataCollection {
         @Expose
         int granularityPeriod;
@@ -143,9 +146,10 @@ public class PmReport {
         String measuredEntitySoftwareVersion;
 
         @Expose
-        Collection<MeasInfoList> measInfoList = new ArrayList<>();
+        Collection<MeasInfoList> measInfoList;
     }
 
+    @Builder(toBuilder = true)
     public static class Perf3gppFields {
         @Expose
         String perf3gppFieldsVersion;
