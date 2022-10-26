@@ -33,7 +33,6 @@ import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.kafka.sender.KafkaSender;
 import reactor.kafka.sender.SenderOptions;
@@ -48,11 +47,10 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
     private static final Logger logger = LoggerFactory.getLogger(KafkaJobDataDistributor.class);
 
     private KafkaSender<byte[], byte[]> sender;
-    private final ApplicationConfig appConfig;
 
-    public KafkaJobDataDistributor(Job job, ApplicationConfig appConfig, Flux<TopicListener.DataFromTopic> input) {
-        super(job, appConfig, input);
-        this.appConfig = appConfig;
+    public KafkaJobDataDistributor(Job job, ApplicationConfig appConfig) {
+        super(job, appConfig);
+
         SenderOptions<byte[], byte[]> senderOptions = senderOptions(appConfig);
         this.sender = KafkaSender.create(senderOptions);
     }

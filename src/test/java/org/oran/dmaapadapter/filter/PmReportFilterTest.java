@@ -145,7 +145,7 @@ class PmReportFilterTest {
         filterData.measTypes.add("pmCounterNumber0");
         PmReportFilter filter = new PmReportFilter(filterData);
         for (int i = 0; i < CNT; ++i) {
-            FilteredData filtered = filter.filter(data);
+            filter.filter(data);
         }
 
         printDuration("Filter", startTime, CNT);

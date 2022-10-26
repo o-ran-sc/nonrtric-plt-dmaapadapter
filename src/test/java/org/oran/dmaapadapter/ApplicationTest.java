@@ -192,7 +192,7 @@ class ApplicationTest {
         {
             Instant startTime = Instant.now();
             for (int i = 0; i < TIMES; ++i) {
-                PmReport reportsParsed = gson.fromJson(pmReportJson, PmReport.class);
+                gson.fromJson(pmReportJson, PmReport.class);
             }
             long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
             logger.info("*** Duration GSON :" + durationSeconds + ", objects/second: " + TIMES / durationSeconds
