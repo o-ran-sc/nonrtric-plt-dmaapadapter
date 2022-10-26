@@ -30,6 +30,7 @@ import java.lang.invoke.MethodHandles;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -86,7 +87,7 @@ import reactor.kafka.sender.SenderRecord;
         "app.pm-files-path=./src/test/resources/", //
         "app.s3.locksBucket=ropfilelocks", //
         "app.pm-files-path=/tmp/dmaapadaptor", //
-        "app.s3.bucket="}) //
+        "app.s3.bucket=icstest"}) //
 class IntegrationWithKafka {
 
     final String KAFKA_TYPE_ID = "KafkaInformationType";
@@ -183,9 +184,24 @@ class IntegrationWithKafka {
             KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type);
 
             topicListener.getFlux() //
+                    .map(this::unzip) //
                     .doOnNext(this::set) //
                     .doFinally(sig -> logger.info("Finally " + sig)) //
                     .subscribe();
+        }
+
+        boolean isUnzip = false;
+
+        private TopicListener.DataFromTopic unzip(TopicListener.DataFromTopic receivedKafkaOutput) {
+            if (!this.isUnzip) {
+                return receivedKafkaOutput;
+            }
+            byte[] unzipped = KafkaTopicListener.unzip(receivedKafkaOutput.value, "junk.gz");
+            return new TopicListener.DataFromTopic(unzipped, receivedKafkaOutput.key);
+        }
+
+        public void setUnzip(boolean unzip) {
+            this.isUnzip = unzip;
         }
 
         private void set(TopicListener.DataFromTopic receivedKafkaOutput) {
@@ -204,6 +220,7 @@ class IntegrationWithKafka {
 
         void reset() {
             this.receivedKafkaOutput = new TopicListener.DataFromTopic(null, null);
+            this.count = 0;
         }
     }
 
@@ -494,8 +511,8 @@ class IntegrationWithKafka {
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.getMeasTypes().add("succImmediateAssignProcs");
-        filterData.getMeasObjClass().add("UtranCell");
+        filterData.getMeasTypes().add("pmCounterNumber0");
+        filterData.getMeasObjClass().add("NRCellCU");
 
         this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
                 restClient());
@@ -509,7 +526,7 @@ class IntegrationWithKafka {
 
         Instant startTime = Instant.now();
 
-        final String FILE_NAME = "pm_report.json.gz";
+        final String FILE_NAME = "A20000626.2315+0200-2330+0200_HTTPS-6-73.json";
 
         DataStore fileStore = dataStore();
 
@@ -532,11 +549,6 @@ class IntegrationWithKafka {
         printStatistics();
     }
 
-    @Test
-    void clear() {
-
-    }
-
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
     @Test
     void kafkaCharacteristics_manyPmJobs() throws Exception {
@@ -551,13 +563,15 @@ class IntegrationWithKafka {
         filterData.getMeasTypes().add("pmCounterNumber1");
         filterData.getMeasObjClass().add("NRCellCU");
 
+        final boolean USE_GZIP = true;
         final int NO_OF_JOBS = 150;
         ArrayList<KafkaReceiver> receivers = new ArrayList<>();
         for (int i = 0; i < NO_OF_JOBS; ++i) {
             final String outputTopic = "manyJobs_" + i;
-            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData, false), outputTopic,
+            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData, USE_GZIP), outputTopic,
                     restClient());
             KafkaReceiver receiver = new KafkaReceiver(this.applicationConfig, outputTopic, this.securityContext);
+            receiver.setUnzip(USE_GZIP);
             receivers.add(receiver);
         }
 
@@ -629,6 +643,8 @@ class IntegrationWithKafka {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.getSourceNames().add("O-DU-1122");
         filterData.setPmRopStartTime("1999-12-27T10:50:44.000-08:00");
+
+        filterData.setPmRopEndTime(OffsetDateTime.now().toString());
 
         this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
                 restClient());

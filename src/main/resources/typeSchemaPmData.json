@@ -54,6 +54,9 @@
                   },
                   "pmRopStartTime": {
                      "type": "string"
+                  },
+                  "pmRopEndTime": {
+                     "type": "string"
                   }
                }
             }

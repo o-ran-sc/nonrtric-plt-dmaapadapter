@@ -130,11 +130,12 @@ public class IcsSimulatorController {
         ProducerInfoTypeInfo type = testResults.types.get(job.infoTypeId);
         if (type == null) {
             logger.error("type not found: {} size: {}", job.infoTypeId, testResults.types.size());
+        } else {
+            assertThat(type).isNotNull();
+            validateJsonObjectAgainstSchema(job.jobDefinition, type.jobDataSchema);
+            logger.debug("ICS Simulator PUT job: {}", body);
+            restClient.post(url, body, MediaType.APPLICATION_JSON).block();
         }
-        assertThat(type).isNotNull();
-        validateJsonObjectAgainstSchema(job.jobDefinition, type.jobDataSchema);
-        logger.debug("ICS Simulator PUT job: {}", body);
-        restClient.post(url, body, MediaType.APPLICATION_JSON).block();
     }
 
     private void validateJsonObjectAgainstSchema(Object object, Object schemaObj) throws ServiceException {
