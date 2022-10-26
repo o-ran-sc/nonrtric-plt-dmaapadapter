@@ -30,6 +30,7 @@ import java.lang.invoke.MethodHandles;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +49,7 @@ import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
 import org.oran.dmaapadapter.controllers.ProducerCallbacksController;
+import org.oran.dmaapadapter.controllers.ProducerCallbacksController.StatisticsCollection;
 import org.oran.dmaapadapter.datastore.DataStore;
 import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.PmReportFilter;
@@ -55,6 +57,7 @@ import org.oran.dmaapadapter.r1.ConsumerJobInfo;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.InfoTypes;
 import org.oran.dmaapadapter.repository.Job;
+import org.oran.dmaapadapter.repository.Job.Statistics;
 import org.oran.dmaapadapter.repository.Jobs;
 import org.oran.dmaapadapter.tasks.KafkaTopicListener;
 import org.oran.dmaapadapter.tasks.NewFileEvent;
@@ -86,7 +89,8 @@ import reactor.kafka.sender.SenderRecord;
         "app.pm-files-path=./src/test/resources/", //
         "app.s3.locksBucket=ropfilelocks", //
         "app.pm-files-path=/tmp/dmaapadaptor", //
-        "app.s3.bucket="}) //
+        "app.s3.bucket=" //
+}) //
 class IntegrationWithKafka {
 
     final String KAFKA_TYPE_ID = "KafkaInformationType";
@@ -183,9 +187,24 @@ class IntegrationWithKafka {
             KafkaTopicListener topicListener = new KafkaTopicListener(applicationConfig, type);
 
             topicListener.getFlux() //
+                    .map(this::unzip) //
                     .doOnNext(this::set) //
                     .doFinally(sig -> logger.info("Finally " + sig)) //
                     .subscribe();
+        }
+
+        boolean isUnzip = false;
+
+        private TopicListener.DataFromTopic unzip(TopicListener.DataFromTopic receivedKafkaOutput) {
+            if (!this.isUnzip) {
+                return receivedKafkaOutput;
+            }
+            byte[] unzipped = KafkaTopicListener.unzip(receivedKafkaOutput.value, "junk.gz");
+            return new TopicListener.DataFromTopic(unzipped, receivedKafkaOutput.key);
+        }
+
+        public void setUnzip(boolean unzip) {
+            this.isUnzip = unzip;
         }
 
         private void set(TopicListener.DataFromTopic receivedKafkaOutput) {
@@ -204,6 +223,7 @@ class IntegrationWithKafka {
 
         void reset() {
             this.receivedKafkaOutput = new TopicListener.DataFromTopic(null, null);
+            this.count = 0;
         }
     }
 
@@ -380,6 +400,27 @@ class IntegrationWithKafka {
         Thread.sleep(4000);
     }
 
+    private void printStatistics() {
+        String targetUri = baseUrl() + ProducerCallbacksController.STATISTICS_URL;
+        String statsResp = restClient().get(targetUri).block();
+        StatisticsCollection stats = gson.fromJson(statsResp, StatisticsCollection.class);
+        int noOfSentBytes = 0;
+        int noOfSentObjs = 0;
+        for (Statistics s : stats.jobStatistics) {
+            noOfSentBytes += s.getNoOfSentBytes();
+            noOfSentObjs += s.getNoOfSentObjects();
+        }
+        logger.error("  Stats noOfSentBytes: {}, noOfSentObjects: {}, noOfTopics: {}", noOfSentBytes, noOfSentObjs,
+                stats.jobStatistics.size());
+    }
+
+    private void printCharacteristicsResult(String str, Instant startTime, int noOfIterations) {
+        final long durationMs = Instant.now().toEpochMilli() - startTime.toEpochMilli();
+        logger.error("*** {} Duration ({} ms),  objects/second: {}", str, durationMs,
+                (noOfIterations * 1000) / durationMs);
+        printStatistics();
+    }
+
     @Test
     void simpleCase() throws Exception {
         final String JOB_ID = "ID";
@@ -445,12 +486,6 @@ class IntegrationWithKafka {
         printStatistics();
     }
 
-    private void printStatistics() {
-        String targetUri = baseUrl() + ProducerCallbacksController.STATISTICS_URL;
-        String stats = restClient().get(targetUri).block();
-        logger.info("Stats : {}", org.apache.commons.lang3.StringUtils.truncate(stats, 1000));
-    }
-
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
     @Test
     void kafkaCharacteristics() throws Exception {
@@ -477,8 +512,7 @@ class IntegrationWithKafka {
             Thread.sleep(1000 * 1);
         }
 
-        final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
-        logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
+        printCharacteristicsResult("kafkaCharacteristics", startTime, NO_OF_OBJECTS);
     }
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
@@ -494,8 +528,8 @@ class IntegrationWithKafka {
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.getMeasTypes().add("succImmediateAssignProcs");
-        filterData.getMeasObjClass().add("UtranCell");
+        filterData.getMeasTypes().add("pmCounterNumber0");
+        filterData.getMeasObjClass().add("NRCellCU");
 
         this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
                 restClient());
@@ -509,7 +543,7 @@ class IntegrationWithKafka {
 
         Instant startTime = Instant.now();
 
-        final String FILE_NAME = "pm_report.json.gz";
+        final String FILE_NAME = "A20000626.2315+0200-2330+0200_HTTPS-6-73.json";
 
         DataStore fileStore = dataStore();
 
@@ -525,22 +559,14 @@ class IntegrationWithKafka {
             Thread.sleep(1000 * 1);
         }
 
-        final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
-        logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
+        printCharacteristicsResult("kafkaCharacteristics_pmFilter_s3", startTime, NO_OF_OBJECTS);
         logger.info("***  kafkaReceiver2 :" + kafkaReceiver.count);
-
-        printStatistics();
-    }
-
-    @Test
-    void clear() {
-
     }
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
     @Test
     void kafkaCharacteristics_manyPmJobs() throws Exception {
-        // Filter PM reports and sent to two jobs over Kafka
+        // Filter PM reports and sent to many jobs over Kafka
 
         // Register producer, Register types
         await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
@@ -551,20 +577,22 @@ class IntegrationWithKafka {
         filterData.getMeasTypes().add("pmCounterNumber1");
         filterData.getMeasObjClass().add("NRCellCU");
 
+        final boolean USE_GZIP = true;
         final int NO_OF_JOBS = 150;
         ArrayList<KafkaReceiver> receivers = new ArrayList<>();
         for (int i = 0; i < NO_OF_JOBS; ++i) {
             final String outputTopic = "manyJobs_" + i;
-            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData, false), outputTopic,
+            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData, USE_GZIP), outputTopic,
                     restClient());
             KafkaReceiver receiver = new KafkaReceiver(this.applicationConfig, outputTopic, this.securityContext);
+            receiver.setUnzip(USE_GZIP);
             receivers.add(receiver);
         }
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(NO_OF_JOBS));
         waitForKafkaListener();
 
-        final int NO_OF_OBJECTS = 1000;
+        final int NO_OF_OBJECTS = 100;
 
         Instant startTime = Instant.now();
 
@@ -581,20 +609,19 @@ class IntegrationWithKafka {
         sendDataToKafka(dataToSend);
 
         while (receivers.get(0).count != NO_OF_OBJECTS) {
-            logger.info("sleeping {}", kafkaReceiver.count);
+            if (kafkaReceiver.count > 0) {
+                logger.info("sleeping {}", kafkaReceiver.count);
+            }
             Thread.sleep(1000 * 1);
         }
 
-        final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
-        logger.info("*** Duration :" + durationSeconds + ", objects/second: " + NO_OF_OBJECTS / durationSeconds);
+        printCharacteristicsResult("kafkaCharacteristics_manyPmJobs", startTime, NO_OF_OBJECTS);
 
         for (KafkaReceiver receiver : receivers) {
             if (receiver.count != NO_OF_OBJECTS) {
                 System.out.println("** Unexpected" + receiver.OUTPUT_TOPIC + " " + receiver.count);
             }
         }
-
-        printStatistics();
     }
 
     private String newFileEvent(String fileName) {
@@ -629,6 +656,8 @@ class IntegrationWithKafka {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.getSourceNames().add("O-DU-1122");
         filterData.setPmRopStartTime("1999-12-27T10:50:44.000-08:00");
+
+        filterData.setPmRopEndTime(OffsetDateTime.now().toString());
 
         this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
                 restClient());

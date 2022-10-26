@@ -30,7 +30,7 @@ import lombok.Builder;
 public class PmReport {
 
     @Expose
-    Event event = new Event();
+    public Event event = new Event();
 
     public static class CommonEventHeader {
         @Expose

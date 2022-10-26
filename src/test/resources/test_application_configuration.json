@@ -4,7 +4,7 @@
          "id": "DmaapInformationType",
          "dmaapTopicUrl": "/dmaap-topic-1",
          "useHttpProxy": false,
-         "isJson": false
+         "isJson": true
       },
       {
          "id": "KafkaInformationType",

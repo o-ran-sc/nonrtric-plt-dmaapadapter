@@ -45,6 +45,7 @@ public class Job {
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     @Builder
+    @Getter
     @Schema(name = "job_statistics", description = "Statistics information for one job")
     public static class Statistics {
 

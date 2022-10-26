@@ -122,7 +122,7 @@ public class KafkaTopicListener implements TopicListener {
         }
     }
 
-    static byte[] unzip(byte[] bytes, String fileName) {
+    public static byte[] unzip(byte[] bytes, String fileName) {
         if (!fileName.endsWith(".gz")) {
             return bytes;
         }

@@ -150,22 +150,21 @@ public class ProducerCallbacksController {
     }
 
     @Schema(name = "statistics_info", description = "Statistics information")
-    public class Statistics {
+    public class StatisticsCollection {
 
         @Schema(description = "Statistics per job")
         public final Collection<Job.Statistics> jobStatistics;
 
-        public Statistics(Collection<Job.Statistics> stats) {
+        public StatisticsCollection(Collection<Job.Statistics> stats) {
             this.jobStatistics = stats;
         }
-
     }
 
     @GetMapping(path = STATISTICS_URL, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Returns statistics", description = "")
     @ApiResponses(value = { //
             @ApiResponse(responseCode = "200", description = "OK", //
-                    content = @Content(schema = @Schema(implementation = Statistics.class))) //
+                    content = @Content(schema = @Schema(implementation = StatisticsCollection.class))) //
     })
     public ResponseEntity<Object> getStatistics() {
         List<Job.Statistics> res = new ArrayList<>();
@@ -173,7 +172,7 @@ public class ProducerCallbacksController {
             res.add(job.getStatistics());
         }
 
-        return new ResponseEntity<>(gson.toJson(new Statistics(res)), HttpStatus.OK);
+        return new ResponseEntity<>(gson.toJson(new StatisticsCollection(res)), HttpStatus.OK);
     }
 
 }

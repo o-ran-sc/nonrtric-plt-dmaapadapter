@@ -62,6 +62,9 @@ public class PmReportFilter implements Filter {
 
         @Setter
         String pmRopStartTime;
+
+        @Setter
+        String pmRopEndTime;
     }
 
     private static class MeasTypesIndexed extends PmReport.MeasTypes {
@@ -132,6 +135,7 @@ public class PmReportFilter implements Filter {
         reportFiltered.event.perf3gppFields = report.event.perf3gppFields.toBuilder().build();
         reportFiltered.event.perf3gppFields.measDataCollection =
                 report.event.perf3gppFields.measDataCollection.toBuilder().build();
+
         reportFiltered.event.perf3gppFields.measDataCollection.measInfoList = filteredMeasObjs;
         return !filteredMeasObjs.isEmpty();
     }

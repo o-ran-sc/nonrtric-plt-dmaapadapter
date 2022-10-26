@@ -20,6 +20,8 @@
 
 package org.oran.dmaapadapter;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -62,6 +64,13 @@ public class DmaapSimulatorController {
         dmaapResponses.add(response);
     }
 
+    public static void reset() {
+        assertThat(dmaapPmResponses).isEmpty();
+        assertThat(dmaapResponses).isEmpty();
+        dmaapPmResponses.clear();
+        dmaapResponses.clear();
+    }
+
     private static String quote(String str) {
         final String q = "\"";
         return q + str.replace(q, "\\\"") + q;
@@ -79,7 +88,7 @@ public class DmaapSimulatorController {
             return nothing();
         } else {
             String resp = dmaapResponses.remove(0);
-            logger.info("DMAAP simulator returned: {}", resp);
+            logger.trace("DMAAP simulator returned: {}", resp);
             return new ResponseEntity<>(resp, HttpStatus.OK);
         }
 
