@@ -25,22 +25,16 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonParser;
-import com.google.protobuf.AbstractMessage.Builder;
-import com.google.protobuf.Message;
-import com.google.protobuf.MessageOrBuilder;
-import com.google.protobuf.util.JsonFormat;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.invoke.MethodHandles;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
-import java.util.ArrayList;
+import java.time.OffsetDateTime;
 import java.util.Map;
 
 import org.json.JSONObject;
@@ -93,7 +87,8 @@ import reactor.test.StepVerifier;
         "app.webclient.trust-store-used=true", //
         "app.configuration-filepath=./src/test/resources/test_application_configuration.json", //
         "app.pm-files-path=/tmp/dmaapadaptor", //
-        "app.s3.endpointOverride="})
+        "app.s3.endpointOverride=" //
+})
 class ApplicationTest {
 
     @Autowired
@@ -126,80 +121,6 @@ class ApplicationTest {
     int localServerHttpPort;
 
     private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-
-    public static class ProtoJsonUtil {
-
-        /**
-         * Makes a Json from a given message or builder
-         *
-         * @param messageOrBuilder is the instance
-         * @return The string representation
-         * @throws IOException if any error occurs
-         */
-        public static String toJson(MessageOrBuilder messageOrBuilder) throws IOException {
-            return JsonFormat.printer().print(messageOrBuilder);
-        }
-
-        /**
-         * Makes a new instance of message based on the json and the class
-         *
-         * @param <T> is the class type
-         * @param json is the json instance
-         * @param clazz is the class instance
-         * @return An instance of T based on the json values
-         * @throws IOException if any error occurs
-         */
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        public static <T extends Message> T fromJson(String json, Class<T> clazz) throws IOException {
-            // https://stackoverflow.com/questions/27642021/calling-parsefrom-method-for-generic-protobuffer-class-in-java/33701202#33701202
-            Builder builder = null;
-            try {
-                // Since we are dealing with a Message type, we can call newBuilder()
-                builder = (Builder) clazz.getMethod("newBuilder").invoke(null);
-
-            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
-                    | NoSuchMethodException | SecurityException e) {
-                return null;
-            }
-
-            // The instance is placed into the builder values
-            JsonFormat.parser().ignoringUnknownFields().merge(json, builder);
-
-            // the instance will be from the build
-            return (T) builder.build();
-        }
-    }
-
-    // @Test
-    void testProtoBuf() throws Exception {
-        String path = "./src/test/resources/A20000626.2315+0200-2330+0200_HTTPS-6-73.xml.gz101.json";
-
-        String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
-
-        PmProtoGenerated.PmRopFile proto = ProtoJsonUtil.fromJson(pmReportJson, PmProtoGenerated.PmRopFile.class);
-        byte[] bytes = proto.toByteArray();
-
-        int TIMES = 100000;
-        {
-            Instant startTime = Instant.now();
-            for (int i = 0; i < TIMES; ++i) {
-                PmProtoGenerated.PmRopFile.parseFrom(bytes);
-            }
-            long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
-            logger.info("*** Duration PROTO :" + durationSeconds + ", objects/second: " + TIMES / durationSeconds
-                    + " time: " + (float) durationSeconds / TIMES);
-        }
-        {
-            Instant startTime = Instant.now();
-            for (int i = 0; i < TIMES; ++i) {
-                PmReport reportsParsed = gson.fromJson(pmReportJson, PmReport.class);
-            }
-            long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
-            logger.info("*** Duration GSON :" + durationSeconds + ", objects/second: " + TIMES / durationSeconds
-                    + " time: " + (float) durationSeconds / TIMES);
-        }
-
-    }
 
     static class TestApplicationConfig extends ApplicationConfig {
 
@@ -242,6 +163,7 @@ class ApplicationTest {
             TestApplicationConfig cfg = new TestApplicationConfig();
             return cfg;
         }
+
     }
 
     @BeforeEach
@@ -262,10 +184,12 @@ class ApplicationTest {
 
     @AfterEach
     void reset() {
+        DmaapSimulatorController.reset();
         for (Job job : this.jobs.getAll()) {
             this.icsSimulatorController.deleteJob(job.getId(), restClient());
         }
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
+        DmaapSimulatorController.reset();
 
         this.consumerController.testResults.reset();
         this.icsSimulatorController.testResults.reset();
@@ -405,10 +329,10 @@ class ApplicationTest {
 
         // Return two messages from DMAAP and verify that these are sent to the owner of
         // the job (consumer)
-        DmaapSimulatorController.addResponse("[\"DmaapResponse123\", \"DmaapResponse223\"]");
+        DmaapSimulatorController.addResponse("[\"{}\", \"{}\"]");
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
-        assertThat(consumer.receivedBodies.get(0)).isEqualTo("[\"DmaapResponse123\", \"DmaapResponse223\"]");
+        assertThat(consumer.receivedBodies.get(0)).isEqualTo("[{}, {}]");
         assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "application/json");
 
         String jobUrl = baseUrl() + ProducerCallbacksController.JOB_URL;
@@ -436,7 +360,6 @@ class ApplicationTest {
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(2));
         assertThat(consumer.receivedBodies.get(0)).isEqualTo("DmaapResponse11");
         assertThat(consumer.receivedBodies.get(1)).isEqualTo("DmaapResponse22");
-        assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "text/plain;charset=UTF-8");
 
         // Delete the job
         this.icsSimulatorController.deleteJob(JOB_ID, restClient());
@@ -448,9 +371,6 @@ class ApplicationTest {
         DmaapSimulatorController.addResponse("[\"DmaapResponse77\", \"DmaapResponse88\"]");
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(4));
     }
-
-    static class PmReportArray extends ArrayList<PmReport> {
-    };
 
     @Test
     void testPmFiltering() throws Exception {
@@ -467,8 +387,9 @@ class ApplicationTest {
         filterData.getMeasObjInstIds().add("UtranCell=Gbg-997");
         filterData.getSourceNames().add("O-DU-1122");
         filterData.getMeasuredEntityDns().add("ManagedElement=RNC-Gbg-1");
-        Job.Parameters param = Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE)
-                .bufferTimeout(new Job.BufferTimeout(123, 456)).build();
+        Job.Parameters param =
+                Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE).build();
+
         String paramJson = gson.toJson(param);
         ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverRest", "EI_PM_JOB_ID", toJson(paramJson));
 
@@ -493,8 +414,8 @@ class ApplicationTest {
         String receivedFiltered = consumer.receivedBodies.get(0);
         assertThat(receivedFiltered).contains("succImmediateAssignProcs").doesNotContain("\"p\":2").contains("\"p\":1");
 
-        PmReportArray reportsParsed = gson.fromJson(receivedFiltered, PmReportArray.class);
-        assertThat(reportsParsed).hasSize(1);
+        PmReport reportsParsed = gson.fromJson(receivedFiltered, PmReport.class);
+        assertThat(reportsParsed.event).isNotNull();
     }
 
     @Test
@@ -512,9 +433,10 @@ class ApplicationTest {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         filterData.getSourceNames().add("O-DU-1122");
         filterData.setPmRopStartTime("1999-12-27T10:50:44.000-08:00");
+        filterData.setPmRopEndTime(OffsetDateTime.now().toString());
 
-        Job.Parameters param = Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE)
-                .bufferTimeout(new Job.BufferTimeout(123, 456)).build();
+        Job.Parameters param =
+                Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE).build();
 
         String paramJson = gson.toJson(param);
         ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverRest", "EI_PM_JOB_ID", toJson(paramJson));
@@ -540,7 +462,7 @@ class ApplicationTest {
         Job.Parameters param =
                 Job.Parameters.builder().filter(expresssion).filterType(Job.Parameters.JSLT_FILTER_TYPE).build();
         String paramJson = gson.toJson(param);
-        ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverRest", JOB_ID, toJson(paramJson));
+        ConsumerJobInfo jobInfo = consumerJobInfo("DmaapInformationType", JOB_ID, toJson(paramJson));
 
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
@@ -549,13 +471,17 @@ class ApplicationTest {
         // filtered PM message
         String path = "./src/test/resources/pm_report.json";
         String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
-        DmaapSimulatorController.addPmResponse(pmReportJson);
+        DmaapSimulatorController.addResponse(json2dmaapResp(pmReportJson));
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
         String receivedFiltered = consumer.receivedBodies.get(0);
         assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "application/json");
         assertThat(receivedFiltered).contains("event");
+    }
+
+    private String json2dmaapResp(String json) {
+        return "[" + quote(json) + "]";
     }
 
     @Test
@@ -591,10 +517,6 @@ class ApplicationTest {
         Map<String, String> headers = consumer.receivedHeaders.get(0);
         assertThat(headers).containsEntry("authorization", "Bearer " + AUTH_TOKEN);
 
-        // This is the only time it is verified that mime type is plaintext when isJson
-        // is false and buffering is not used
-        assertThat(consumer.receivedHeaders.get(0)).containsEntry("content-type", "text/plain;charset=UTF-8");
-
         Files.delete(authFile);
         this.securityContext.setAuthTokenFilePath(null);
     }
@@ -607,7 +529,7 @@ class ApplicationTest {
         waitForRegistration();
 
         // Create a job with JsonPath Filtering
-        ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverRest", JOB_ID, this.jsonObjectJsonPath());
+        ConsumerJobInfo jobInfo = consumerJobInfo("DmaapInformationType", JOB_ID, this.jsonObjectJsonPath());
 
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
@@ -616,7 +538,7 @@ class ApplicationTest {
         // filtered PM message
         String path = "./src/test/resources/pm_report.json";
         String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
-        DmaapSimulatorController.addPmResponse(pmReportJson);
+        DmaapSimulatorController.addResponse(json2dmaapResp(pmReportJson));
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));

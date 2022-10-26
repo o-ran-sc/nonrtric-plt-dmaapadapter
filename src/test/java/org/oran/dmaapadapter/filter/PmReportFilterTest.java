@@ -24,20 +24,73 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.protobuf.AbstractMessage.Builder;
+import com.google.protobuf.Message;
+import com.google.protobuf.MessageOrBuilder;
+import com.google.protobuf.util.JsonFormat;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
+import org.oran.dmaapadapter.PmProtoGenerated;
 import org.oran.dmaapadapter.filter.Filter.FilteredData;
+import org.oran.dmaapadapter.tasks.KafkaTopicListener;
 import org.oran.dmaapadapter.tasks.TopicListener;
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 class PmReportFilterTest {
+
+    public static class ProtoJsonUtil {
+
+        /**
+         * Makes a Json from a given message or builder
+         *
+         * @param messageOrBuilder is the instance
+         * @return The string representation
+         * @throws IOException if any error occurs
+         */
+        public static String toJson(MessageOrBuilder messageOrBuilder) throws IOException {
+            return JsonFormat.printer().print(messageOrBuilder);
+        }
+
+        /**
+         * Makes a new instance of message based on the json and the class
+         *
+         * @param <T> is the class type
+         * @param json is the json instance
+         * @param clazz is the class instance
+         * @return An instance of T based on the json values
+         * @throws IOException if any error occurs
+         */
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        public static <T extends Message> T fromJson(String json, Class<T> clazz) throws IOException {
+            // https://stackoverflow.com/questions/27642021/calling-parsefrom-method-for-generic-protobuffer-class-in-java/33701202#33701202
+            Builder builder = null;
+            try {
+                // Since we are dealing with a Message type, we can call newBuilder()
+                builder = (Builder) clazz.getMethod("newBuilder").invoke(null);
+
+            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
+                    | NoSuchMethodException | SecurityException e) {
+                return null;
+            }
+
+            // The instance is placed into the builder values
+            JsonFormat.parser().ignoringUnknownFields().merge(json, builder);
+
+            // the instance will be from the build
+            return (T) builder.build();
+        }
+    }
+
     private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     private String filterReport(PmReportFilter filter) throws Exception {
@@ -121,40 +174,69 @@ class PmReportFilterTest {
         assertThat(filtered).contains("O-DU-1122");
     }
 
-    void testCharacteristics() throws Exception {
+    // @Test
+    void testSomeCharacteristics() throws Exception {
         Gson gson = new GsonBuilder() //
                 .disableHtmlEscaping() //
                 .create(); //
 
         String path = "./src/test/resources/A20000626.2315+0200-2330+0200_HTTPS-6-73.json";
-        String report = Files.readString(Path.of(path), Charset.defaultCharset());
 
-        TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, report.getBytes());
+        String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
 
-        Instant startTime = Instant.now();
+        PmProtoGenerated.PmRopFile proto = ProtoJsonUtil.fromJson(pmReportJson, PmProtoGenerated.PmRopFile.class);
+        byte[] bytes = proto.toByteArray();
 
-        int CNT = 100000;
-        for (int i = 0; i < CNT; ++i) {
-            gson.fromJson(data.valueAsString(), PmReport.class);
+        int TIMES = 100000;
+
+        {
+            path = "./src/test/resources/A20000626.2315+0200-2330+0200_HTTPS-6-73.json.gz";
+            byte[] pmReportZipped = Files.readAllBytes(Path.of(path));
+
+            Instant startTime = Instant.now();
+            for (int i = 0; i < TIMES; ++i) {
+                KafkaTopicListener.unzip(pmReportZipped, "junk.gz");
+            }
+
+            printDuration("Unzip", startTime, TIMES);
         }
-        printDuration("Parse", startTime, CNT);
+        {
 
-        startTime = Instant.now();
+            PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+            filterData.getMeasTypes().add("pmCounterNumber0");
+            filterData.getMeasObjClass().add("NRCellCU");
+            PmReportFilter filter = new PmReportFilter(filterData);
+            DataFromTopic topicData = new DataFromTopic(null, pmReportJson.getBytes());
 
-        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.measTypes.add("pmCounterNumber0");
-        PmReportFilter filter = new PmReportFilter(filterData);
-        for (int i = 0; i < CNT; ++i) {
-            FilteredData filtered = filter.filter(data);
+            Instant startTime = Instant.now();
+            for (int i = 0; i < TIMES; ++i) {
+                filter.filter(topicData);
+            }
+            printDuration("PM Filter", startTime, TIMES);
         }
 
-        printDuration("Filter", startTime, CNT);
+        {
+            Instant startTime = Instant.now();
+            for (int i = 0; i < TIMES; ++i) {
+                PmProtoGenerated.PmRopFile.parseFrom(bytes);
+            }
+
+            printDuration("Protobuf parsing", startTime, TIMES);
+        }
+        {
+            Instant startTime = Instant.now();
+            for (int i = 0; i < TIMES; ++i) {
+                gson.fromJson(pmReportJson, PmReport.class);
+            }
+            printDuration("Json parsing", startTime, TIMES);
+        }
+
     }
 
     void printDuration(String str, Instant startTime, int noOfIterations) {
-        final long durationSeconds = Instant.now().getEpochSecond() - startTime.getEpochSecond();
-        logger.info("*** Duration " + str + " :" + durationSeconds + ", objects/second: "
-                + noOfIterations / durationSeconds);
+        final long durationMs = Instant.now().toEpochMilli() - startTime.toEpochMilli();
+        logger.info("*** Duration (ms) " + str + " :" + durationMs + ", objects/second: "
+                + (noOfIterations * 1000) / durationMs);
     }
 
     @Test
