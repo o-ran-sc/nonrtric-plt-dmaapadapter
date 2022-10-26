@@ -56,7 +56,6 @@ public abstract class JobDataDistributor {
     private final Job job;
     private Disposable subscription;
     private final ErrorStats errorStats = new ErrorStats();
-    private final ApplicationConfig applConfig;
 
     private final DataStore dataStore;
     private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
@@ -87,20 +86,13 @@ public abstract class JobDataDistributor {
         }
     }
 
-    protected JobDataDistributor(Job job, ApplicationConfig applConfig, Flux<TopicListener.DataFromTopic> input) {
+    protected JobDataDistributor(Job job, ApplicationConfig applConfig) {
         this.job = job;
-        this.applConfig = applConfig;
         this.dataStore = DataStore.create(applConfig);
         this.dataStore.create(DataStore.Bucket.FILES).subscribe();
         this.dataStore.create(DataStore.Bucket.LOCKS).subscribe();
 
         this.errorStats.resetIrrecoverableErrors();
-        this.subscription = filterAndBuffer(input, this.job) //
-                .flatMap(this::sendToClient, job.getParameters().getMaxConcurrency()) //
-                .onErrorResume(this::handleError) //
-                .subscribe(this::handleSentOk, //
-                        this::handleExceptionInStream, //
-                        () -> logger.warn("HttpDataConsumer stopped jobId: {}", job.getId()));
     }
 
     static class LockedException extends ServiceException {
@@ -109,8 +101,17 @@ public abstract class JobDataDistributor {
         }
     }
 
-    public void collectHistoricalData() {
+    public void start(Flux<TopicListener.DataFromTopic> input) {
         PmReportFilter filter = job.getFilter() instanceof PmReportFilter ? (PmReportFilter) job.getFilter() : null;
+
+        if (filter == null || filter.getFilterData().getPmRopEndTime() == null) {
+            this.subscription = filterAndBuffer(input, this.job) //
+                    .flatMap(this::sendToClient, job.getParameters().getMaxConcurrency()) //
+                    .onErrorResume(this::handleError) //
+                    .subscribe(this::handleSentOk, //
+                            this::handleExceptionInStream, //
+                            () -> logger.warn("HttpDataConsumer stopped jobId: {}", job.getId()));
+        }
 
         if (filter != null && filter.getFilterData().getPmRopStartTime() != null) {
             this.dataStore.createLock(collectHistoricalDataLockName()) //
@@ -123,7 +124,8 @@ public abstract class JobDataDistributor {
                     .doOnNext(sourceName -> logger.debug("Checking source name: {}, jobId: {}", sourceName,
                             this.job.getId())) //
                     .flatMap(sourceName -> dataStore.listObjects(DataStore.Bucket.FILES, sourceName), 1) //
-                    .filter(fileName -> filterStartTime(filter.getFilterData().getPmRopStartTime(), fileName)) //
+                    .filter(this::isRopFile).filter(fileName -> filterStartTime(filter.getFilterData(), fileName)) //
+                    .filter(fileName -> filterEndTime(filter.getFilterData(), fileName)) //
                     .map(this::createFakeEvent) //
                     .flatMap(data -> KafkaTopicListener.getDataFromFileIfNewPmFileEvent(data, this.job.getType(),
                             dataStore), 100)
@@ -176,31 +178,56 @@ public abstract class JobDataDistributor {
         return new TopicListener.DataFromTopic(null, gson.toJson(ev).getBytes());
     }
 
-    private boolean filterStartTime(String startTimeStr, String fileName) {
+    private static String fileTimePartFromRopFileName(String fileName) {
+        return fileName.substring(fileName.lastIndexOf("/") + 2);
+    }
+
+    private static boolean filterStartTime(PmReportFilter.FilterData filter, String fileName) {
         // A20000626.2315+0200-2330+0200_HTTPS-6-73.json
         try {
-            if (fileName.endsWith(".json") || fileName.endsWith(".json.gz")) {
+            String fileTimePart = fileTimePartFromRopFileName(fileName);
+            fileTimePart = fileTimePart.substring(0, 18);
+            OffsetDateTime fileStartTime = parseFileDate(fileTimePart);
+            OffsetDateTime startTime = OffsetDateTime.parse(filter.getPmRopStartTime());
+            boolean isMatch = fileStartTime.isAfter(startTime);
+            logger.debug("Checking file: {}, fileStartTime: {}, filterStartTime: {}, isAfter: {}", fileName,
+                    fileStartTime, startTime, isMatch);
+            return isMatch;
+        } catch (Exception e) {
+            logger.warn("Time parsing exception: {}", e.getMessage());
+            return false;
+        }
+    }
 
-                String fileTimePart = fileName.substring(fileName.lastIndexOf("/") + 2);
-                fileTimePart = fileTimePart.substring(0, 18);
+    private boolean isRopFile(String fileName) {
+        return fileName.endsWith(".json") || fileName.endsWith(".json.gz");
+    }
 
-                DateTimeFormatter formatter =
-                        new DateTimeFormatterBuilder().appendPattern("yyyyMMdd.HHmmZ").toFormatter();
-
-                OffsetDateTime fileStartTime = OffsetDateTime.parse(fileTimePart, formatter);
-                OffsetDateTime startTime = OffsetDateTime.parse(startTimeStr);
-                boolean isBefore = startTime.isBefore(fileStartTime);
-                logger.debug("Checking file: {}, fileStartTime: {}, filterStartTime: {}, isBefore: {}", fileName,
-                        fileStartTime, startTime, isBefore);
-                return isBefore;
-            } else {
-                return false;
-            }
+    private static boolean filterEndTime(PmReportFilter.FilterData filter, String fileName) {
+        // A20000626.2315+0200-2330+0200_HTTPS-6-73.json
+        if (filter.getPmRopEndTime() == null) {
+            return true;
+        }
+        try {
+            String fileTimePart = fileTimePartFromRopFileName(fileName);
+            fileTimePart = fileTimePart.substring(0, 9) + fileTimePart.substring(19, 28);
+            OffsetDateTime fileEndTime = parseFileDate(fileTimePart);
+            OffsetDateTime endTime = OffsetDateTime.parse(filter.getPmRopEndTime());
+            boolean isMatch = fileEndTime.isBefore(endTime);
+            logger.debug("Checking file: {}, fileEndTime: {}, endTime: {}, isBefore: {}", fileName, fileEndTime,
+                    endTime, isMatch);
+            return isMatch;
 
         } catch (Exception e) {
             logger.warn("Time parsing exception: {}", e.getMessage());
             return false;
         }
+    }
+
+    private static OffsetDateTime parseFileDate(String timeStr) {
+        DateTimeFormatter startTimeFormatter =
+                new DateTimeFormatterBuilder().appendPattern("yyyyMMdd.HHmmZ").toFormatter();
+        return OffsetDateTime.parse(timeStr, startTimeFormatter);
     }
 
     private void handleExceptionInStream(Throwable t) {
