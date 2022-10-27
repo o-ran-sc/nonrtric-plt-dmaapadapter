@@ -24,6 +24,30 @@
       "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "d60c733b_fb803f53",
+        "filename": "src/main/java/org/oran/dmaapadapter/tasks/JobDataDistributor.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 184,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-10-27T07:17:28Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "147773ec_75ff1fec",
+      "range": {
+        "startLine": 184,
+        "startChar": 12,
+        "endLine": 184,
+        "endChar": 84
+      },
+      "revId": "1b06b1c6a0a9dd179d81e611ea3355bd4d809daf",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "c3dc4fb9_c8334c60",
@@ -47,6 +71,30 @@
       "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "229ec234_899228ac",
+        "filename": "src/main/java/org/oran/dmaapadapter/tasks/JobDataDistributor.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 199,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-10-27T07:17:28Z",
+      "side": 1,
+      "message": "ROP files are not mixed with other files in our environment. This component will never be used in a production system.",
+      "parentUuid": "c3dc4fb9_c8334c60",
+      "range": {
+        "startLine": 199,
+        "startChar": 34,
+        "endLine": 199,
+        "endChar": 39
+      },
+      "revId": "1b06b1c6a0a9dd179d81e611ea3355bd4d809daf",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "eae86e84_a8c6c58e",
@@ -60,6 +108,24 @@
       "writtenOn": "2022-10-26T14:52:37Z",
       "side": 1,
       "message": "This new code is not covered by any test",
+      "revId": "1b06b1c6a0a9dd179d81e611ea3355bd4d809daf",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8bc2e68b_7311639c",
+        "filename": "src/main/java/org/oran/dmaapadapter/tasks/JobDataDistributor.java",
+        "patchSetId": 2
+      },
+      "lineNbr": 208,
+      "author": {
+        "id": 1000262
+      },
+      "writtenOn": "2022-10-27T07:17:28Z",
+      "side": 1,
+      "message": "It was tested in the IntegrationWithKafka but now it will also be tested in ApplicationTest.",
+      "parentUuid": "eae86e84_a8c6c58e",
       "revId": "1b06b1c6a0a9dd179d81e611ea3355bd4d809daf",
       "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
     }
