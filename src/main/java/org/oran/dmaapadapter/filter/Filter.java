@@ -20,8 +20,13 @@
 
 package org.oran.dmaapadapter.filter;
 
+import java.util.ArrayList;
+
+import lombok.Getter;
 import lombok.ToString;
 
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 
 public interface Filter {
@@ -34,6 +39,10 @@ public interface Filter {
     public static class FilteredData {
         public final byte[] key;
         public final byte[] value;
+
+        @Getter
+        private final boolean isZipped;
+
         private static final FilteredData emptyData = new FilteredData(null, null);
 
         public boolean isEmpty() {
@@ -41,8 +50,13 @@ public interface Filter {
         }
 
         public FilteredData(byte[] key, byte[] value) {
+            this(key, value, false);
+        }
+
+        public FilteredData(byte[] key, byte[] value, boolean isZipped) {
             this.key = key;
             this.value = value;
+            this.isZipped = isZipped;
         }
 
         public String getValueAString() {
@@ -51,6 +65,15 @@ public interface Filter {
 
         public static FilteredData empty() {
             return emptyData;
+        }
+
+        public Iterable<Header> headers() {
+            ArrayList<Header> result = new ArrayList<>();
+            if (isZipped()) {
+                Header h = new RecordHeader(DataFromTopic.ZIP_PROPERTY, null);
+                result.add(h);
+            }
+            return result;
         }
     }
 

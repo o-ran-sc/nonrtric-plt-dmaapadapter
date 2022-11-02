@@ -124,6 +124,11 @@ public class ApplicationConfig {
     @Value("${app.s3.bucket:}")
     private String s3Bucket;
 
+    @Getter
+    @Setter
+    @Value("${app.zip-output:}")
+    private boolean zipOutput;
+
     private WebClientConfig webClientConfig = null;
 
     public WebClientConfig getWebClientConfig() {

@@ -59,6 +59,7 @@ public abstract class JobDataDistributor {
 
     private final DataStore dataStore;
     private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
+    private final ApplicationConfig applConfig;
 
     private class ErrorStats {
         private int consumerFaultCounter = 0;
@@ -87,6 +88,7 @@ public abstract class JobDataDistributor {
     }
 
     protected JobDataDistributor(Job job, ApplicationConfig applConfig) {
+        this.applConfig = applConfig;
         this.job = job;
         this.dataStore = DataStore.create(applConfig);
         this.dataStore.create(DataStore.Bucket.FILES).subscribe();
@@ -105,8 +107,9 @@ public abstract class JobDataDistributor {
         PmReportFilter filter = job.getFilter() instanceof PmReportFilter ? (PmReportFilter) job.getFilter() : null;
 
         if (filter == null || filter.getFilterData().getPmRopEndTime() == null) {
-            this.subscription = filterAndBuffer(input, this.job) //
-                    .flatMap(this::sendToClient, job.getParameters().getMaxConcurrency()) //
+            this.subscription = Flux.just(input) //
+                    .flatMap(in -> filterAndBuffer(in, this.job)) //
+                    .flatMap(this::sendToClient) //
                     .onErrorResume(this::handleError) //
                     .subscribe(this::handleSentOk, //
                             this::handleExceptionInStream, //
@@ -138,7 +141,7 @@ public abstract class JobDataDistributor {
     }
 
     private Filter.FilteredData gzip(Filter.FilteredData data) {
-        if (job.getParameters().isGzip()) {
+        if (this.applConfig.isZipOutput()) {
             try {
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 GZIPOutputStream gzip = new GZIPOutputStream(out);
@@ -146,7 +149,7 @@ public abstract class JobDataDistributor {
                 gzip.flush();
                 gzip.close();
                 byte[] zipped = out.toByteArray();
-                return new Filter.FilteredData(data.key, zipped);
+                return new Filter.FilteredData(data.key, zipped, true);
             } catch (IOException e) {
                 logger.error("Unexpected exception when zipping: {}", e.getMessage());
                 return data;
@@ -175,7 +178,7 @@ public abstract class JobDataDistributor {
 
         NewFileEvent ev = new NewFileEvent(fileName);
 
-        return new TopicListener.DataFromTopic(null, gson.toJson(ev).getBytes());
+        return new TopicListener.DataFromTopic(null, gson.toJson(ev).getBytes(), false);
     }
 
     private static String fileTimePartFromRopFileName(String fileName) {
