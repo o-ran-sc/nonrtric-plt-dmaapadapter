@@ -33,7 +33,7 @@ import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 class JsltFilterTest {
 
     private String filterReport(JsltFilter filter) throws Exception {
-        DataFromTopic data = new DataFromTopic(null, loadReport().getBytes());
+        DataFromTopic data = new DataFromTopic(null, loadReport().getBytes(), null);
         FilteredData filtered = filter.filter(data);
         return filtered.getValueAString();
     }

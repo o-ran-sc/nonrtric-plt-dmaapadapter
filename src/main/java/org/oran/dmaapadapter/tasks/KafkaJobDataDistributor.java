@@ -20,15 +20,19 @@
 
 package org.oran.dmaapadapter.tasks;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
+import org.oran.dmaapadapter.filter.Filter.FilteredData;
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,7 +100,17 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
     private SenderRecord<byte[], byte[], Integer> senderRecord(Filter.FilteredData output, Job infoJob) {
         int correlationMetadata = 2;
         String topic = infoJob.getParameters().getKafkaOutputTopic();
-        return SenderRecord.create(new ProducerRecord<>(topic, output.key, output.value), correlationMetadata);
+        var producerRecord = new ProducerRecord<>(topic, null, null, output.key, output.value, headers(output));
+        return SenderRecord.create(producerRecord, correlationMetadata);
+    }
+
+    private Iterable<Header> headers(Filter.FilteredData output) {
+        ArrayList<Header> result = new ArrayList<>();
+        if (output.isZipped()) {
+            Header h = new RecordHeader(FilteredData.ZIP_PROPERTY, null);
+            result.add(h);
+        }
+        return result;
     }
 
 }

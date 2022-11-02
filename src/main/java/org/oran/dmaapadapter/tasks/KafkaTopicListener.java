@@ -77,8 +77,9 @@ public class KafkaTopicListener implements TopicListener {
                 .doOnError(t -> logger.error("KafkaTopicReceiver error: {}", t.getMessage())) //
                 .doFinally(sig -> logger.error("KafkaTopicReceiver stopped, reason: {}", sig)) //
                 .filter(t -> t.value().length > 0 || t.key().length > 0) //
-                .map(input -> new DataFromTopic(input.key(), input.value())) //
-                .flatMap(data -> getDataFromFileIfNewPmFileEvent(data, type, dataStore), 100).publish() //
+                .map(input -> new DataFromTopic(input.key(), input.value(), input.headers())) //
+                .flatMap(data -> getDataFromFileIfNewPmFileEvent(data, type, dataStore), 100) //
+                .publish() //
                 .autoConnect(1);
     }
 
@@ -115,7 +116,7 @@ public class KafkaTopicListener implements TopicListener {
 
             return fileStore.readObject(DataStore.Bucket.FILES, ev.getFilename()) //
                     .map(bytes -> unzip(bytes, ev.getFilename())) //
-                    .map(bytes -> new DataFromTopic(data.key, bytes));
+                    .map(bytes -> new DataFromTopic(data.key, bytes, data.getHeaders()));
 
         } catch (Exception e) {
             return Mono.just(data);

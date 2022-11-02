@@ -20,6 +20,7 @@
 
 package org.oran.dmaapadapter.filter;
 
+import lombok.Getter;
 import lombok.ToString;
 
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
@@ -34,6 +35,11 @@ public interface Filter {
     public static class FilteredData {
         public final byte[] key;
         public final byte[] value;
+        public static final String ZIP_PROPERTY = DataFromTopic.ZIP_PROPERTY;
+
+        @Getter
+        private final boolean isZipped;
+
         private static final FilteredData emptyData = new FilteredData(null, null);
 
         public boolean isEmpty() {
@@ -41,8 +47,13 @@ public interface Filter {
         }
 
         public FilteredData(byte[] key, byte[] value) {
+            this(key, value, false);
+        }
+
+        public FilteredData(byte[] key, byte[] value, boolean isZipped) {
             this.key = key;
             this.value = value;
+            this.isZipped = isZipped;
         }
 
         public String getValueAString() {

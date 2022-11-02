@@ -84,6 +84,7 @@ app:
   # If the file name is empty, no authorization token is used
   auth-token-file:
   pm-files-path: /tmp
+  zip-output: false
   s3:
     endpointOverride: http://localhost:9000
     accessKeyId: minio

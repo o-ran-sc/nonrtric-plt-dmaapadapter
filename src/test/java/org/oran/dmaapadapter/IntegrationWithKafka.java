@@ -89,7 +89,7 @@ import reactor.kafka.sender.SenderRecord;
         "app.pm-files-path=./src/test/resources/", //
         "app.s3.locksBucket=ropfilelocks", //
         "app.pm-files-path=/tmp/dmaapadaptor", //
-        "app.s3.bucket=" //
+        "app.s3.bucket=dmaaptest" //
 }) //
 class IntegrationWithKafka {
 
@@ -170,10 +170,12 @@ class IntegrationWithKafka {
         public final String OUTPUT_TOPIC;
         private TopicListener.DataFromTopic receivedKafkaOutput;
         private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+        private final ApplicationConfig applicationConfig;
 
         int count = 0;
 
         public KafkaReceiver(ApplicationConfig applicationConfig, String outputTopic, SecurityContext securityContext) {
+            this.applicationConfig = applicationConfig;
             this.OUTPUT_TOPIC = outputTopic;
 
             // Create a listener to the output topic. The KafkaTopicListener happens to be
@@ -193,18 +195,13 @@ class IntegrationWithKafka {
                     .subscribe();
         }
 
-        boolean isUnzip = false;
-
         private TopicListener.DataFromTopic unzip(TopicListener.DataFromTopic receivedKafkaOutput) {
-            if (!this.isUnzip) {
+            assertThat(this.applicationConfig.isZipOutput()).isEqualTo(receivedKafkaOutput.isZipped());
+            if (!receivedKafkaOutput.isZipped()) {
                 return receivedKafkaOutput;
             }
             byte[] unzipped = KafkaTopicListener.unzip(receivedKafkaOutput.value, "junk.gz");
-            return new TopicListener.DataFromTopic(unzipped, receivedKafkaOutput.key);
-        }
-
-        public void setUnzip(boolean unzip) {
-            this.isUnzip = unzip;
+            return new TopicListener.DataFromTopic(unzipped, receivedKafkaOutput.key, receivedKafkaOutput.getHeaders());
         }
 
         private void set(TopicListener.DataFromTopic receivedKafkaOutput) {
@@ -222,7 +219,7 @@ class IntegrationWithKafka {
         }
 
         void reset() {
-            this.receivedKafkaOutput = new TopicListener.DataFromTopic(null, null);
+            this.receivedKafkaOutput = new TopicListener.DataFromTopic(null, null, null);
             this.count = 0;
         }
     }
@@ -232,6 +229,8 @@ class IntegrationWithKafka {
 
     @BeforeEach
     void init() {
+        this.applicationConfig.setZipOutput(false);
+
         if (kafkaReceiver == null) {
             kafkaReceiver = new KafkaReceiver(this.applicationConfig, "ouputTopic", this.securityContext);
             kafkaReceiver2 = new KafkaReceiver(this.applicationConfig, "ouputTopic2", this.securityContext);
@@ -289,11 +288,10 @@ class IntegrationWithKafka {
         return "https://localhost:" + this.applicationConfig.getLocalServerHttpPort();
     }
 
-    private static Object jobParametersAsJsonObject(String filter, long maxTimeMiliseconds, int maxSize,
-            int maxConcurrency) {
+    private static Object jobParametersAsJsonObject(String filter, long maxTimeMiliseconds, int maxSize) {
         Job.BufferTimeout buffer = maxSize > 0 ? new Job.BufferTimeout(maxSize, maxTimeMiliseconds) : null;
         Job.Parameters param = Job.Parameters.builder().filter(filter).filterType(Job.Parameters.REGEXP_TYPE)
-                .bufferTimeout(buffer).maxConcurrency(maxConcurrency).build();
+                .bufferTimeout(buffer).build();
 
         String str = gson.toJson(param);
         return jsonObject(str);
@@ -307,21 +305,20 @@ class IntegrationWithKafka {
         }
     }
 
-    ConsumerJobInfo consumerJobInfo(String filter, Duration maxTime, int maxSize, int maxConcurrency) {
+    ConsumerJobInfo consumerJobInfo(String filter, Duration maxTime, int maxSize) {
         try {
             String targetUri = baseUrl() + ConsumerController.CONSUMER_TARGET_URL;
-            return new ConsumerJobInfo(KAFKA_TYPE_ID,
-                    jobParametersAsJsonObject(filter, maxTime.toMillis(), maxSize, maxConcurrency), "owner", targetUri,
-                    "");
+            return new ConsumerJobInfo(KAFKA_TYPE_ID, jobParametersAsJsonObject(filter, maxTime.toMillis(), maxSize),
+                    "owner", targetUri, "");
         } catch (Exception e) {
             return null;
         }
     }
 
-    ConsumerJobInfo consumerJobInfoKafka(String topic, PmReportFilter.FilterData filterData, boolean gzip) {
+    ConsumerJobInfo consumerJobInfoKafka(String topic, PmReportFilter.FilterData filterData) {
         try {
             Job.Parameters param = Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE)
-                    .kafkaOutputTopic(topic).gzip(gzip).build();
+                    .kafkaOutputTopic(topic).build();
 
             String str = gson.toJson(param);
             Object parametersObj = jsonObject(str);
@@ -330,10 +327,6 @@ class IntegrationWithKafka {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    ConsumerJobInfo consumerJobInfoKafka(String topic, PmReportFilter.FilterData filterData) {
-        return consumerJobInfoKafka(topic, filterData, false);
     }
 
     ConsumerJobInfo consumerJobInfoKafka(String topic) {
@@ -429,7 +422,7 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
-        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0, 1), JOB_ID, restClient());
+        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0), JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
         waitForKafkaListener();
 
@@ -449,9 +442,8 @@ class IntegrationWithKafka {
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         // Create two jobs. One buffering and one with a filter
-        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ofMillis(400), 10, 20), JOB_ID1,
-                restClient());
-        this.icsSimulatorController.addJob(consumerJobInfo("^Message_1$", Duration.ZERO, 0, 1), JOB_ID2, restClient());
+        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ofMillis(400), 10), JOB_ID1, restClient());
+        this.icsSimulatorController.addJob(consumerJobInfo("^Message_1$", Duration.ZERO, 0), JOB_ID2, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
         waitForKafkaListener();
 
@@ -577,22 +569,21 @@ class IntegrationWithKafka {
         filterData.getMeasTypes().add("pmCounterNumber1");
         filterData.getMeasObjClass().add("NRCellCU");
 
-        final boolean USE_GZIP = true;
+        this.applicationConfig.setZipOutput(true);
         final int NO_OF_JOBS = 150;
         ArrayList<KafkaReceiver> receivers = new ArrayList<>();
         for (int i = 0; i < NO_OF_JOBS; ++i) {
             final String outputTopic = "manyJobs_" + i;
-            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData, USE_GZIP), outputTopic,
+            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData), outputTopic,
                     restClient());
             KafkaReceiver receiver = new KafkaReceiver(this.applicationConfig, outputTopic, this.securityContext);
-            receiver.setUnzip(USE_GZIP);
             receivers.add(receiver);
         }
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(NO_OF_JOBS));
         waitForKafkaListener();
 
-        final int NO_OF_OBJECTS = 100;
+        final int NO_OF_OBJECTS = 1000;
 
         Instant startTime = Instant.now();
 
@@ -608,10 +599,12 @@ class IntegrationWithKafka {
         var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord(eventAsString, "key", PM_TYPE_ID));
         sendDataToKafka(dataToSend);
 
-        while (receivers.get(0).count != NO_OF_OBJECTS) {
+        logger.info("sleeping {}", kafkaReceiver.count);
+        while (receivers.get(0).count < NO_OF_OBJECTS) {
             if (kafkaReceiver.count > 0) {
-                logger.info("sleeping {}", kafkaReceiver.count);
+                logger.info("sleeping {}", receivers.get(0).count);
             }
+
             Thread.sleep(1000 * 1);
         }
 
@@ -676,9 +669,8 @@ class IntegrationWithKafka {
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         // Create two jobs.
-        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ofMillis(400), 1000, 1), JOB_ID1,
-                restClient());
-        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0, 1), JOB_ID2, restClient());
+        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ofMillis(400), 1000), JOB_ID1, restClient());
+        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0), JOB_ID2, restClient());
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
 
@@ -691,7 +683,7 @@ class IntegrationWithKafka {
         this.icsSimulatorController.deleteJob(JOB_ID1, restClient());
         this.icsSimulatorController.deleteJob(JOB_ID2, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
-        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0, 1), JOB_ID2, restClient());
+        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ZERO, 0), JOB_ID2, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
         dataToSend = Flux.just(kafkaSenderRecord("Howdy", "", KAFKA_TYPE_ID));

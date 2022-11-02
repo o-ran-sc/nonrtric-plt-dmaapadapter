@@ -20,11 +20,11 @@
 
 package org.oran.dmaapadapter.tasks;
 
-
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import org.apache.kafka.common.header.Header;
 import org.oran.dmaapadapter.filter.PmReport;
 import reactor.core.publisher.Flux;
 
@@ -34,6 +34,8 @@ public interface TopicListener {
     public static class DataFromTopic {
         public final byte[] key;
         public final byte[] value;
+        @Getter
+        private final Iterable<Header> headers;
 
         private static byte[] noBytes = new byte[0];
 
@@ -42,13 +44,28 @@ public interface TopicListener {
         @ToString.Exclude
         private PmReport cachedPmReport;
 
-        public DataFromTopic(byte[] key, byte[] value) {
+        public DataFromTopic(byte[] key, byte[] value, Iterable<Header> headers) {
             this.key = key == null ? noBytes : key;
             this.value = value == null ? noBytes : value;
+            this.headers = headers;
         }
 
         public String valueAsString() {
             return new String(this.value);
+        }
+
+        public static final String ZIP_PROPERTY = "zip";
+
+        public boolean isZipped() {
+            if (headers == null) {
+                return false;
+            }
+            for (Header h : this.headers) {
+                if (h.key().equals(ZIP_PROPERTY)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
     }

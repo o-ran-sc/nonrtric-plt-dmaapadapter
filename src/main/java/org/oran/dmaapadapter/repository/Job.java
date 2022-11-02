@@ -115,21 +115,8 @@ public class Job {
         @Getter
         private BufferTimeout bufferTimeout;
 
-        private Integer maxConcurrency;
-
         @Getter
         private String kafkaOutputTopic;
-
-        @Getter
-        private Boolean gzip;
-
-        public int getMaxConcurrency() {
-            return maxConcurrency == null || maxConcurrency == 1 ? 1 : maxConcurrency;
-        }
-
-        public boolean isGzip() {
-            return gzip != null && gzip;
-        }
 
         public Filter.Type getFilterType() {
             if (filter == null || filterType == null) {
