@@ -97,7 +97,7 @@ public class ApplicationConfig {
     private String kafkaBootStrapServers;
 
     @Getter
-    @Value("${app.kafka.max-poll-records:100}")
+    @Value("${app.kafka.max-poll-records:300}")
     private int kafkaMaxPollRecords;
 
     @Getter
@@ -123,6 +123,11 @@ public class ApplicationConfig {
     @Getter
     @Value("${app.s3.bucket:}")
     private String s3Bucket;
+
+    @Getter
+    @Setter
+    @Value("${app.zip-output:}")
+    private boolean zipOutput;
 
     private WebClientConfig webClientConfig = null;
 

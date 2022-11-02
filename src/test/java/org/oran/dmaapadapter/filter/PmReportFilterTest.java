@@ -94,7 +94,7 @@ class PmReportFilterTest {
     private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     private String filterReport(PmReportFilter filter) throws Exception {
-        TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes());
+        TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes(), false);
         FilteredData filtered = filter.filter(data);
         return filtered.getValueAString();
     }
@@ -145,7 +145,7 @@ class PmReportFilterTest {
         }
 
         {
-            TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes());
+            TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes(), false);
 
             PmReportFilter.FilterData utranCellFilter = new PmReportFilter.FilterData();
             utranCellFilter.measObjClass.add("UtranCell");
@@ -195,7 +195,7 @@ class PmReportFilterTest {
 
             Instant startTime = Instant.now();
             for (int i = 0; i < TIMES; ++i) {
-                KafkaTopicListener.unzip(pmReportZipped, "junk.gz");
+                KafkaTopicListener.unzip(pmReportZipped);
             }
 
             printDuration("Unzip", startTime, TIMES);
@@ -206,7 +206,7 @@ class PmReportFilterTest {
             filterData.getMeasTypes().add("pmCounterNumber0");
             filterData.getMeasObjClass().add("NRCellCU");
             PmReportFilter filter = new PmReportFilter(filterData);
-            DataFromTopic topicData = new DataFromTopic(null, pmReportJson.getBytes());
+            DataFromTopic topicData = new DataFromTopic(null, pmReportJson.getBytes(), false);
 
             Instant startTime = Instant.now();
             for (int i = 0; i < TIMES; ++i) {
@@ -259,10 +259,10 @@ class PmReportFilterTest {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         PmReportFilter filter = new PmReportFilter(filterData);
 
-        FilteredData filtered = filter.filter(new TopicListener.DataFromTopic(null, "junk".getBytes()));
+        FilteredData filtered = filter.filter(new TopicListener.DataFromTopic(null, "junk".getBytes(), false));
         assertThat(filtered.isEmpty()).isTrue();
 
-        filtered = filter.filter(new TopicListener.DataFromTopic(null, reQuote("{'msg': 'test'}").getBytes()));
+        filtered = filter.filter(new TopicListener.DataFromTopic(null, reQuote("{'msg': 'test'}").getBytes(), false));
         assertThat(filtered.isEmpty()).isTrue();
 
     }

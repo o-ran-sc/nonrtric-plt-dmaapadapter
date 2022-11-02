@@ -96,7 +96,8 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
     private SenderRecord<byte[], byte[], Integer> senderRecord(Filter.FilteredData output, Job infoJob) {
         int correlationMetadata = 2;
         String topic = infoJob.getParameters().getKafkaOutputTopic();
-        return SenderRecord.create(new ProducerRecord<>(topic, output.key, output.value), correlationMetadata);
+        var producerRecord = new ProducerRecord<>(topic, null, null, output.key, output.value, output.headers());
+        return SenderRecord.create(producerRecord, correlationMetadata);
     }
 
 }
