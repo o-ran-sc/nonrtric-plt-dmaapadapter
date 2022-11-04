@@ -31,13 +31,11 @@ import lombok.Getter;
 
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.datastore.DataStore;
-import org.oran.dmaapadapter.exceptions.ServiceException;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import reactor.core.Disposable;
@@ -97,32 +95,30 @@ public abstract class JobDataDistributor {
         this.errorStats.resetIrrecoverableErrors();
     }
 
-    static class LockedException extends ServiceException {
-        public LockedException(String file) {
-            super(file, HttpStatus.NOT_FOUND);
-        }
-    }
-
     public void start(Flux<TopicListener.DataFromTopic> input) {
+        logger.debug("Starting distribution, job: {}, to topic: {}", this.job.getId(),
+                job.getParameters().getKafkaOutputTopic());
         PmReportFilter filter = job.getFilter() instanceof PmReportFilter ? (PmReportFilter) job.getFilter() : null;
 
         if (filter == null || filter.getFilterData().getPmRopEndTime() == null) {
-            this.subscription = Flux.just(input) //
-                    .flatMap(in -> filterAndBuffer(in, this.job)) //
+            this.subscription = filterAndBuffer(input, this.job) //
                     .flatMap(this::sendToClient) //
                     .onErrorResume(this::handleError) //
                     .subscribe(this::handleSentOk, //
                             this::handleExceptionInStream, //
-                            () -> logger.warn("HttpDataConsumer stopped jobId: {}", job.getId()));
+                            () -> logger.warn("JobDataDistributor stopped jobId: {}", job.getId()));
         }
 
         if (filter != null && filter.getFilterData().getPmRopStartTime() != null) {
             this.dataStore.createLock(collectHistoricalDataLockName()) //
-                    .flatMap(isLockGranted -> Boolean.TRUE.equals(isLockGranted) ? Mono.just(isLockGranted)
-                            : Mono.error(new LockedException(collectHistoricalDataLockName()))) //
-                    .doOnNext(n -> logger.debug("Checking historical PM ROP files, jobId: {}", this.job.getId())) //
-                    .doOnError(t -> logger.debug("Skipping check of historical PM ROP files, already done. jobId: {}",
-                            this.job.getId())) //
+                    .doOnNext(isLockGranted -> {
+                        if (isLockGranted.booleanValue()) {
+                            logger.debug("Checking historical PM ROP files, jobId: {}", this.job.getId());
+                        } else {
+                            logger.debug("Skipping check of historical PM ROP files, already done. jobId: {}",
+                                    this.job.getId());
+                        }
+                    }).filter(isLockGranted -> isLockGranted) //
                     .flatMapMany(b -> Flux.fromIterable(filter.getFilterData().getSourceNames())) //
                     .doOnNext(sourceName -> logger.debug("Checking source name: {}, jobId: {}", sourceName,
                             this.job.getId())) //
@@ -160,14 +156,9 @@ public abstract class JobDataDistributor {
     }
 
     private Mono<String> handleCollectHistoricalDataError(Throwable t) {
-        if (t instanceof LockedException) {
-            logger.debug("Locked exception: {} job: {}", t.getMessage(), job.getId());
-            return Mono.empty(); // Ignore
-        } else {
-            logger.error("Exception: {} job: {}", t.getMessage(), job.getId());
-            return tryDeleteLockFile() //
-                    .map(bool -> "OK");
-        }
+        logger.error("Exception: {} job: {}", t.getMessage(), job.getId());
+        return tryDeleteLockFile() //
+                .map(bool -> "OK");
     }
 
     private String collectHistoricalDataLockName() {
@@ -260,11 +251,14 @@ public abstract class JobDataDistributor {
 
     private Flux<Filter.FilteredData> filterAndBuffer(Flux<TopicListener.DataFromTopic> inputFlux, Job job) {
         Flux<Filter.FilteredData> filtered = //
-                inputFlux.doOnNext(data -> job.getStatistics().received(data.value)) //
+                inputFlux //
+                        .doOnNext(data -> logger.trace("Received data, job {}", job.getId())) //
+                        .doOnNext(data -> job.getStatistics().received(data.value)) //
                         .map(job::filter) //
                         .map(this::gzip) //
                         .filter(f -> !f.isEmpty()) //
-                        .doOnNext(f -> job.getStatistics().filtered(f.value)); //
+                        .doOnNext(f -> job.getStatistics().filtered(f.value)) //
+                        .doOnNext(data -> logger.trace("Filtered data, job {}", job.getId())); //
 
         if (job.isBuffered()) {
             filtered = filtered.map(input -> quoteNonJson(input.getValueAString(), job)) //
@@ -289,6 +283,7 @@ public abstract class JobDataDistributor {
         logger.warn("exception: {} job: {}", t.getMessage(), job.getId());
         this.errorStats.handleException(t);
         if (this.errorStats.isItHopeless()) {
+            logger.error("Giving up: {} job: {}", t.getMessage(), job.getId());
             return Mono.error(t);
         } else {
             return Mono.empty(); // Ignore

@@ -32,6 +32,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.BytesWrapper;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
@@ -164,7 +165,7 @@ class S3ObjectStore implements DataStore {
 
         return Mono.fromFuture(future) //
                 .map(f -> s3Bucket) //
-                .doOnError(t -> logger.debug("Could not create S3 bucket: {}", t.getMessage()))
+                .doOnError(t -> logger.trace("Could not create S3 bucket: {}", t.getMessage()))
                 .onErrorResume(t -> Mono.just(s3Bucket));
     }
 
@@ -246,10 +247,10 @@ class S3ObjectStore implements DataStore {
                 s3AsynchClient.getObject(request, AsyncResponseTransformer.toBytes());
 
         return Mono.fromFuture(future) //
-                .map(b -> b.asByteArray()) //
+                .map(BytesWrapper::asByteArray) //
                 .doOnError(t -> logger.error("Failed to get file from S3, key:{}, bucket: {}, {}", key, bucket,
                         t.getMessage())) //
-                .doOnEach(n -> logger.debug("Read file from S3: {} {}", bucket, key)) //
+                .doOnNext(n -> logger.debug("Read file from S3: {} {}", bucket, key)) //
                 .onErrorResume(t -> Mono.empty());
     }
 

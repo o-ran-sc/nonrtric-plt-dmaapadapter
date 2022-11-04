@@ -213,7 +213,7 @@ class IntegrationWithKafka {
         private void set(TopicListener.DataFromTopic receivedKafkaOutput) {
             this.receivedKafkaOutput = receivedKafkaOutput;
             this.count++;
-            logger.debug("*** received {}, {}", OUTPUT_TOPIC, receivedKafkaOutput);
+            logger.debug("*** received data on topic: {}", OUTPUT_TOPIC);
         }
 
         synchronized String lastKey() {
@@ -409,8 +409,8 @@ class IntegrationWithKafka {
             noOfSentBytes += s.getNoOfSentBytes();
             noOfSentObjs += s.getNoOfSentObjects();
         }
-        logger.error("  Stats noOfSentBytes: {}, noOfSentObjects: {}, noOfTopics: {}", noOfSentBytes, noOfSentObjs,
-                stats.jobStatistics.size());
+        logger.error("  Stats noOfSentBytes (total): {}, noOfSentObjects (total): {}, noOfTopics: {}", noOfSentBytes,
+                noOfSentObjs, stats.jobStatistics.size());
     }
 
     private void printCharacteristicsResult(String str, Instant startTime, int noOfIterations) {
@@ -537,7 +537,7 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
         waitForKafkaListener();
 
-        final int NO_OF_OBJECTS = 50;
+        final int NO_OF_OBJECTS = 10;
 
         Instant startTime = Instant.now();
 
@@ -552,13 +552,15 @@ class IntegrationWithKafka {
         var dataToSend = Flux.range(1, NO_OF_OBJECTS).map(i -> kafkaSenderRecord(eventAsString, "key", PM_TYPE_ID));
         sendDataToKafka(dataToSend);
 
-        while (kafkaReceiver.count != NO_OF_OBJECTS) {
+        while (kafkaReceiver.count < NO_OF_OBJECTS) {
             logger.info("sleeping {}", kafkaReceiver.count);
             Thread.sleep(1000 * 1);
         }
 
         printCharacteristicsResult("kafkaCharacteristics_pmFilter_s3", startTime, NO_OF_OBJECTS);
         logger.info("***  kafkaReceiver2 :" + kafkaReceiver.count);
+
+        assertThat(kafkaReceiver.count).isEqualTo(NO_OF_OBJECTS);
     }
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
@@ -618,7 +620,7 @@ class IntegrationWithKafka {
 
         for (KafkaReceiver receiver : receivers) {
             if (receiver.count != NO_OF_OBJECTS) {
-                System.out.println("** Unexpected" + receiver.OUTPUT_TOPIC + " " + receiver.count);
+                System.out.println("** Unexpected no of jobs: " + receiver.OUTPUT_TOPIC + " " + receiver.count);
             }
         }
     }

@@ -156,7 +156,7 @@ public class ProducerRegstrationTask {
                 .doOnError(t -> logger.error("Could not create job of type {}, reason: {}", type.getInputJobType(),
                         t.getMessage()))
                 .onErrorResume(t -> Mono.just("")) //
-                .doOnNext(n -> logger.info("Created job: {}, type: {}", JOB_ID, type.getInputJobType())) //
+                .doOnNext(n -> logger.info("Created input job: {}, type: {}", JOB_ID, type.getInputJobType())) //
                 .map(x -> type);
     }
 
