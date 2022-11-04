@@ -93,9 +93,20 @@ class PmReportFilterTest {
 
     private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+    private static Gson gson = new GsonBuilder() //
+            .disableHtmlEscaping() //
+            .create(); //
+
     private String filterReport(PmReportFilter filter) throws Exception {
+
         TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes(), false);
         FilteredData filtered = filter.filter(data);
+
+        String reportAfterFilter = gson.toJson(data.getCachedPmReport());
+        String reportBeforeFilter = gson.toJson(gson.fromJson(loadReport(), PmReport.class));
+
+        assertThat(reportAfterFilter).isEqualTo(reportBeforeFilter);
+
         return filtered.getValueAString();
     }
 
@@ -176,10 +187,6 @@ class PmReportFilterTest {
 
     // @Test
     void testSomeCharacteristics() throws Exception {
-        Gson gson = new GsonBuilder() //
-                .disableHtmlEscaping() //
-                .create(); //
-
         String path = "./src/test/resources/A20000626.2315+0200-2330+0200_HTTPS-6-73.json";
 
         String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());

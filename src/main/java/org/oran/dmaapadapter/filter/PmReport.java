@@ -93,6 +93,13 @@ public class PmReport {
 
         @Expose
         String sValue = "";
+
+        public MeasResult copy() {
+            MeasResult c = new MeasResult();
+            c.p = this.p;
+            c.sValue = this.sValue;
+            return c;
+        }
     }
 
     public static class MeasValuesList {

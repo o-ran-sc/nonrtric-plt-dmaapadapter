@@ -160,7 +160,7 @@ public class PmReportFilter implements Filter {
 
         for (PmReport.MeasResult measResult : oldMeasResults) {
             if (isMeasResultMatch(measResult, measTypes, filter)) {
-                newMeasResults.add(measResult);
+                newMeasResults.add(measResult.copy());
             }
         }
         return newMeasResults;

@@ -94,9 +94,8 @@ public class KafkaTopicListener implements TopicListener {
         consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, this.type.getKafkaGroupId());
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
-        consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
+        consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId);
-        consumerProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, this.applicationConfig.getKafkaMaxPollRecords());
 
         return ReceiverOptions.<byte[], byte[]>create(consumerProps)
                 .subscription(Collections.singleton(this.type.getKafkaInputTopic()));
@@ -104,7 +103,7 @@ public class KafkaTopicListener implements TopicListener {
 
     public static Mono<DataFromTopic> getDataFromFileIfNewPmFileEvent(DataFromTopic data, InfoType type,
             DataStore fileStore) {
-        if (type.getDataType() != InfoType.DataType.PM_DATA || data.value.length > 1000) {
+        if (type.getDataType() != InfoType.DataType.PM_DATA) {
             return Mono.just(data);
         }
 
@@ -115,7 +114,7 @@ public class KafkaTopicListener implements TopicListener {
                 logger.warn("Ignoring received message: {}", data);
                 return Mono.empty();
             }
-
+            logger.trace("Reading PM measurements, type: {}, inputTopic: {}", type.getId(), type.getKafkaInputTopic());
             return fileStore.readObject(DataStore.Bucket.FILES, ev.getFilename()) //
                     .map(bytes -> unzip(bytes, ev.getFilename())) //
                     .map(bytes -> new DataFromTopic(data.key, bytes, false));
