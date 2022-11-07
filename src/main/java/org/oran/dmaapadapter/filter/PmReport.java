@@ -26,53 +26,57 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
+@Builder(toBuilder = true)
 public class PmReport {
 
     @Expose
-    public Event event = new Event();
+    public Event event;
 
     public static class CommonEventHeader {
         @Expose
-        String domain;
+        private String domain;
 
         @Expose
-        String eventId;
+        private String eventId;
 
         @Expose
-        int sequence;
+        private int sequence;
 
         @Expose
-        String eventName;
+        private String eventName;
 
         @Expose
-        String sourceName;
+        @Getter
+        private String sourceName;
 
         @Expose
-        String reportingEntityName;
+        private String reportingEntityName;
 
         @Expose
-        String priority;
+        private String priority;
 
         @Expose
-        long startEpochMicrosec;
+        private long startEpochMicrosec;
 
         @Expose
-        long lastEpochMicrosec;
+        private long lastEpochMicrosec;
 
         @Expose
-        String version;
+        private String version;
 
         @Expose
-        String vesEventListenerVersion;
+        private String vesEventListenerVersion;
 
         @Expose
-        String timeZoneOffset;
+        private String timeZoneOffset;
     }
 
     public static class MeasInfoId {
         @Expose
-        String sMeasInfoId = "";
+        private String sMeasInfoId = "";
     }
 
     public static class MeasTypes {
@@ -87,90 +91,92 @@ public class PmReport {
         protected ArrayList<String> sMeasTypesList = new ArrayList<>();
     }
 
+    @Getter
+    @Builder(toBuilder = true)
     public static class MeasResult {
         @Expose
-        int p;
+        @Setter
+        private int p;
 
         @Expose
-        String sValue = "";
-
-        public MeasResult copy() {
-            MeasResult c = new MeasResult();
-            c.p = this.p;
-            c.sValue = this.sValue;
-            return c;
-        }
+        private String sValue;
     }
 
+    @Builder(toBuilder = true)
     public static class MeasValuesList {
         @Expose
-        String measObjInstId;
+        @Getter
+        private String measObjInstId;
 
         @Expose
-        String suspectFlag;
+        private String suspectFlag;
 
         @Expose
-        Collection<MeasResult> measResults = new ArrayList<>();
+        @Getter
+        private Collection<MeasResult> measResults;
 
-        public MeasValuesList shallowClone() {
-            MeasValuesList n = new MeasValuesList();
-            n.measObjInstId = this.measObjInstId;
-            n.suspectFlag = this.suspectFlag;
-            return n;
+        public boolean isEmpty() {
+            return this.measResults.isEmpty();
+        }
+
+        static MeasValuesList emptyList = MeasValuesList.builder().measResults(new ArrayList<>()).build();
+
+        public static MeasValuesList empty() {
+            return emptyList;
         }
     }
 
+    @Getter
+    @Builder(toBuilder = true)
     public static class MeasInfoList {
         @Expose
-        MeasInfoId measInfoId;
+        private MeasInfoId measInfoId;
 
         @Expose
-        MeasTypes measTypes;
+        private MeasTypes measTypes;
 
         @Expose
-        Collection<MeasValuesList> measValuesList = new ArrayList<>();
+        private Collection<MeasValuesList> measValuesList;
 
-        public MeasInfoList shallowClone() {
-            MeasInfoList n = new MeasInfoList();
-            n.measInfoId = this.measInfoId;
-            n.measTypes = new MeasTypes();
-            return n;
-        }
     }
 
     @Builder(toBuilder = true)
+    @Getter
     public static class MeasDataCollection {
         @Expose
-        int granularityPeriod;
+        private int granularityPeriod;
 
         @Expose
-        String measuredEntityUserName;
+        private String measuredEntityUserName;
 
         @Expose
-        String measuredEntityDn;
+        private String measuredEntityDn;
 
         @Expose
-        String measuredEntitySoftwareVersion;
+        private String measuredEntitySoftwareVersion;
 
         @Expose
-        Collection<MeasInfoList> measInfoList;
+        private Collection<MeasInfoList> measInfoList;
     }
 
     @Builder(toBuilder = true)
+    @Getter
     public static class Perf3gppFields {
         @Expose
-        String perf3gppFieldsVersion;
+        private String perf3gppFieldsVersion;
 
         @Expose
-        MeasDataCollection measDataCollection;
+        private MeasDataCollection measDataCollection;
     }
 
+    @Getter
+    @Builder(toBuilder = true)
     public static class Event {
         @Expose
-        CommonEventHeader commonEventHeader;
+        private CommonEventHeader commonEventHeader;
 
         @Expose
-        Perf3gppFields perf3gppFields;
+        private Perf3gppFields perf3gppFields;
     }
 
 }

@@ -30,6 +30,13 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
 
+import org.oran.dmaapadapter.filter.PmReport.Event;
+import org.oran.dmaapadapter.filter.PmReport.MeasDataCollection;
+import org.oran.dmaapadapter.filter.PmReport.MeasInfoList;
+import org.oran.dmaapadapter.filter.PmReport.MeasResult;
+import org.oran.dmaapadapter.filter.PmReport.MeasTypes;
+import org.oran.dmaapadapter.filter.PmReport.MeasValuesList;
+import org.oran.dmaapadapter.filter.PmReport.Perf3gppFields;
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,14 +98,14 @@ public class PmReportFilter implements Filter {
     public FilteredData filter(DataFromTopic data) {
         try {
             PmReport report = getPmReport(data);
-            PmReport reportFiltered = new PmReport();
 
-            if (report.event.perf3gppFields == null) {
+            if (report.event == null || report.event.getPerf3gppFields() == null) {
                 logger.warn("Received PM report with no perf3gppFields, ignored. {}", data);
                 return FilteredData.empty();
             }
 
-            if (!filter(report, reportFiltered, this.filterData)) {
+            PmReport reportFiltered = filter(report, this.filterData);
+            if (reportFiltered == null) {
                 return FilteredData.empty();
             }
             return new FilteredData(data.key, gson.toJson(reportFiltered).getBytes());
@@ -125,19 +132,29 @@ public class PmReportFilter implements Filter {
      * @param filterData
      * @return true if there is anything left in the report
      */
-    private boolean filter(PmReport report, PmReport reportFiltered, FilterData filterData) {
+    private PmReport filter(PmReport report, FilterData filterData) {
         if (!matchSourceNames(report, filterData.sourceNames)) {
-            return false;
+            return null;
         }
 
-        Collection<PmReport.MeasInfoList> filteredMeasObjs = createMeasObjInstIds(report, filterData);
-        reportFiltered.event.commonEventHeader = report.event.commonEventHeader;
-        reportFiltered.event.perf3gppFields = report.event.perf3gppFields.toBuilder().build();
-        reportFiltered.event.perf3gppFields.measDataCollection =
-                report.event.perf3gppFields.measDataCollection.toBuilder().build();
+        Collection<MeasInfoList> filteredMeasObjs = createMeasObjInstIds(report, filterData);
+        if (filteredMeasObjs.isEmpty()) {
+            return null;
+        }
+        MeasDataCollection measDataCollection = report.event.getPerf3gppFields().getMeasDataCollection().toBuilder() //
+                .measInfoList(filteredMeasObjs) //
+                .build();
 
-        reportFiltered.event.perf3gppFields.measDataCollection.measInfoList = filteredMeasObjs;
-        return !filteredMeasObjs.isEmpty();
+        Perf3gppFields perf3gppFields =
+                report.event.getPerf3gppFields().toBuilder().measDataCollection(measDataCollection) //
+                        .build();
+        Event event = report.event.toBuilder() //
+                .perf3gppFields(perf3gppFields) //
+                .build();
+
+        return report.toBuilder() //
+                .event(event) //
+                .build();
     }
 
     private boolean isContainedInAny(String aString, Collection<String> collection) {
@@ -149,18 +166,18 @@ public class PmReportFilter implements Filter {
         return false;
     }
 
-    private boolean isMeasResultMatch(PmReport.MeasResult measResult, PmReport.MeasTypes measTypes, FilterData filter) {
-        String measType = measTypes.getMeasType(measResult.p);
+    private boolean isMeasResultMatch(MeasResult measResult, MeasTypes measTypes, FilterData filter) {
+        String measType = measTypes.getMeasType(measResult.getP());
         return filter.measTypes.isEmpty() || filter.measTypes.contains(measType);
     }
 
-    private Collection<PmReport.MeasResult> createMeasResults(Collection<PmReport.MeasResult> oldMeasResults,
-            PmReport.MeasTypes measTypes, FilterData filter) {
-        Collection<PmReport.MeasResult> newMeasResults = new ArrayList<>();
+    private Collection<MeasResult> createMeasResults(Collection<MeasResult> oldMeasResults, MeasTypes measTypes,
+            FilterData filter) {
+        Collection<MeasResult> newMeasResults = new ArrayList<>();
 
-        for (PmReport.MeasResult measResult : oldMeasResults) {
+        for (MeasResult measResult : oldMeasResults) {
             if (isMeasResultMatch(measResult, measTypes, filter)) {
-                newMeasResults.add(measResult.copy());
+                newMeasResults.add(measResult.toBuilder().build());
             }
         }
         return newMeasResults;
@@ -191,56 +208,65 @@ public class PmReportFilter implements Filter {
         return filter.measObjClass.contains(measObjClass);
     }
 
-    private PmReport.MeasValuesList createMeasValuesList(PmReport.MeasValuesList oldMeasValues,
-            PmReport.MeasTypes measTypes, FilterData filter) {
+    private MeasValuesList createMeasValuesList(MeasValuesList oldMeasValues, MeasTypes measTypes, FilterData filter) {
 
-        PmReport.MeasValuesList newMeasValuesList = oldMeasValues.shallowClone();
+        if (isMeasInstIdMatch(oldMeasValues.getMeasObjInstId(), filter)
+                && isMeasInstClassMatch(oldMeasValues.getMeasObjInstId(), filter)) {
 
-        if (isMeasInstIdMatch(oldMeasValues.measObjInstId, filter)
-                && isMeasInstClassMatch(oldMeasValues.measObjInstId, filter)) {
-            newMeasValuesList.measResults = createMeasResults(oldMeasValues.measResults, measTypes, filter);
+            Collection<MeasResult> newResults = createMeasResults(oldMeasValues.getMeasResults(), measTypes, filter);
+            return oldMeasValues.toBuilder() //
+                    .measResults(newResults) //
+                    .build();
+        } else {
+            return MeasValuesList.empty();
         }
-        return newMeasValuesList;
     }
 
-    private PmReport.MeasTypes createMeasTypes(Collection<PmReport.MeasValuesList> measValues,
-            PmReport.MeasTypes oldMMeasTypes) {
+    private MeasTypes createMeasTypes(Collection<MeasValuesList> newMeasValues, MeasTypes oldMMeasTypes) {
         MeasTypesIndexed newMeasTypes = new MeasTypesIndexed();
-        for (PmReport.MeasValuesList l : measValues) {
-            for (PmReport.MeasResult r : l.measResults) {
-                String measTypeName = oldMMeasTypes.getMeasType(r.p);
-                r.p = newMeasTypes.addP(measTypeName);
+        for (MeasValuesList l : newMeasValues) {
+            for (MeasResult r : l.getMeasResults()) {
+                String measTypeName = oldMMeasTypes.getMeasType(r.getP());
+                int newP = newMeasTypes.addP(measTypeName);
+                r.setP(newP);
             }
         }
         return newMeasTypes;
     }
 
-    private PmReport.MeasInfoList createMeasInfoList(PmReport.MeasInfoList oldMeasInfoList, FilterData filter) {
-        PmReport.MeasInfoList newMeasInfoList = oldMeasInfoList.shallowClone();
+    private MeasInfoList createMeasInfoList(MeasInfoList oldMeasInfoList, FilterData filter) {
 
-        for (PmReport.MeasValuesList oldValues : oldMeasInfoList.measValuesList) {
-            PmReport.MeasValuesList newMeasValues = createMeasValuesList(oldValues, oldMeasInfoList.measTypes, filter);
-            if (!newMeasValues.measResults.isEmpty()) {
-                newMeasInfoList.measValuesList.add(newMeasValues);
+        Collection<MeasValuesList> measValueLists = new ArrayList<>();
+        for (MeasValuesList oldValues : oldMeasInfoList.getMeasValuesList()) {
+            MeasValuesList newMeasValues = createMeasValuesList(oldValues, oldMeasInfoList.getMeasTypes(), filter);
+            if (!newMeasValues.isEmpty()) {
+                measValueLists.add(newMeasValues);
             }
         }
-        newMeasInfoList.measTypes = createMeasTypes(newMeasInfoList.measValuesList, oldMeasInfoList.measTypes);
-        return newMeasInfoList;
+
+        MeasTypes newMeasTypes = createMeasTypes(measValueLists, oldMeasInfoList.getMeasTypes());
+
+        return oldMeasInfoList.toBuilder() //
+                .measTypes(newMeasTypes).measValuesList(measValueLists) //
+                .build();
+
     }
 
     private boolean matchMeasuredEntityDns(PmReport report, FilterData filter) {
-        return filter.measuredEntityDns.isEmpty() || this.isContainedInAny(
-                report.event.perf3gppFields.measDataCollection.measuredEntityDn, filter.measuredEntityDns);
+        return filter.measuredEntityDns.isEmpty()
+                || this.isContainedInAny(report.event.getPerf3gppFields().getMeasDataCollection().getMeasuredEntityDn(),
+                        filter.measuredEntityDns);
     }
 
-    private Collection<PmReport.MeasInfoList> createMeasObjInstIds(PmReport report, FilterData filter) {
-        Collection<PmReport.MeasInfoList> newList = new ArrayList<>();
+    private Collection<MeasInfoList> createMeasObjInstIds(PmReport report, FilterData filter) {
+        Collection<MeasInfoList> newList = new ArrayList<>();
         if (!matchMeasuredEntityDns(report, filter)) {
             return newList;
         }
-        for (PmReport.MeasInfoList oldMeasInfoList : report.event.perf3gppFields.measDataCollection.measInfoList) {
-            PmReport.MeasInfoList l = createMeasInfoList(oldMeasInfoList, filter);
-            if (!l.measValuesList.isEmpty()) {
+        for (MeasInfoList oldMeasInfoList : report.event.getPerf3gppFields().getMeasDataCollection()
+                .getMeasInfoList()) {
+            MeasInfoList l = createMeasInfoList(oldMeasInfoList, filter);
+            if (!l.getMeasValuesList().isEmpty()) {
                 newList.add(l);
             }
         }
@@ -248,7 +274,7 @@ public class PmReportFilter implements Filter {
     }
 
     private boolean matchSourceNames(PmReport report, Collection<String> sourceNames) {
-        return sourceNames.isEmpty() || sourceNames.contains(report.event.commonEventHeader.sourceName);
+        return sourceNames.isEmpty() || sourceNames.contains(report.event.getCommonEventHeader().getSourceName());
     }
 
 }

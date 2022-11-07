@@ -118,12 +118,14 @@ public abstract class JobDataDistributor {
                             logger.debug("Skipping check of historical PM ROP files, already done. jobId: {}",
                                     this.job.getId());
                         }
-                    }).filter(isLockGranted -> isLockGranted) //
+                    }) //
+                    .filter(isLockGranted -> isLockGranted) //
                     .flatMapMany(b -> Flux.fromIterable(filter.getFilterData().getSourceNames())) //
                     .doOnNext(sourceName -> logger.debug("Checking source name: {}, jobId: {}", sourceName,
                             this.job.getId())) //
                     .flatMap(sourceName -> dataStore.listObjects(DataStore.Bucket.FILES, sourceName), 1) //
-                    .filter(this::isRopFile).filter(fileName -> filterStartTime(filter.getFilterData(), fileName)) //
+                    .filter(this::isRopFile) //
+                    .filter(fileName -> filterStartTime(filter.getFilterData(), fileName)) //
                     .filter(fileName -> filterEndTime(filter.getFilterData(), fileName)) //
                     .map(this::createFakeEvent) //
                     .flatMap(data -> KafkaTopicListener.getDataFromFileIfNewPmFileEvent(data, this.job.getType(),

@@ -283,12 +283,12 @@ class PmReportFilterTest {
         com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
         PmReport report = gson.fromJson(loadReport(), PmReport.class);
 
-        String dn = report.event.perf3gppFields.measDataCollection.measuredEntityDn;
+        String dn = report.event.getPerf3gppFields().getMeasDataCollection().getMeasuredEntityDn();
         String json = gson.toJson(report);
         report = gson.fromJson(json, PmReport.class);
 
         // '=' is escaped to unicode by gson. but converted back
-        assertThat(report.event.perf3gppFields.measDataCollection.measuredEntityDn).isEqualTo(dn);
+        assertThat(report.event.getPerf3gppFields().getMeasDataCollection().getMeasuredEntityDn()).isEqualTo(dn);
     }
 
     private String loadReport() throws Exception {
