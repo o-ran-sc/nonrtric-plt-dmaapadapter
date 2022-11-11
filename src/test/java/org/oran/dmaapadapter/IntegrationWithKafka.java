@@ -577,8 +577,8 @@ class IntegrationWithKafka {
         filterData.getMeasTypes().add("pmCounterNumber1");
         filterData.getMeasObjClass().add("NRCellCU");
 
-        this.applicationConfig.setZipOutput(true);
-        final int NO_OF_JOBS = 150;
+        this.applicationConfig.setZipOutput(false);
+        final int NO_OF_JOBS = 100;
         ArrayList<KafkaReceiver> receivers = new ArrayList<>();
         for (int i = 0; i < NO_OF_JOBS; ++i) {
             final String outputTopic = "manyJobs_" + i;
@@ -591,7 +591,7 @@ class IntegrationWithKafka {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(NO_OF_JOBS));
         waitForKafkaListener();
 
-        final int NO_OF_OBJECTS = 1000;
+        final int NO_OF_OBJECTS = 10000;
 
         Instant startTime = Instant.now();
 

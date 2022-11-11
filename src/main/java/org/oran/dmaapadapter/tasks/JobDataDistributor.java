@@ -36,7 +36,6 @@ import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.repository.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
@@ -60,28 +59,15 @@ public abstract class JobDataDistributor {
     private final ApplicationConfig applConfig;
 
     private class ErrorStats {
+        @Getter
         private int consumerFaultCounter = 0;
-        private boolean irrecoverableError = false; // eg. overflow
 
         public void handleOkFromConsumer() {
             this.consumerFaultCounter = 0;
         }
 
         public void handleException(Throwable t) {
-            if (t instanceof WebClientResponseException) {
-                ++this.consumerFaultCounter;
-            } else {
-                irrecoverableError = true;
-            }
-        }
-
-        public boolean isItHopeless() {
-            final int STOP_AFTER_ERRORS = 5;
-            return irrecoverableError || consumerFaultCounter > STOP_AFTER_ERRORS;
-        }
-
-        public void resetIrrecoverableErrors() {
-            irrecoverableError = false;
+            ++this.consumerFaultCounter;
         }
     }
 
@@ -91,8 +77,6 @@ public abstract class JobDataDistributor {
         this.dataStore = DataStore.create(applConfig);
         this.dataStore.create(DataStore.Bucket.FILES).subscribe();
         this.dataStore.create(DataStore.Bucket.LOCKS).subscribe();
-
-        this.errorStats.resetIrrecoverableErrors();
     }
 
     public void start(Flux<TopicListener.DataFromTopic> input) {
@@ -168,9 +152,7 @@ public abstract class JobDataDistributor {
     }
 
     private TopicListener.DataFromTopic createFakeEvent(String fileName) {
-
         NewFileEvent ev = new NewFileEvent(fileName);
-
         return new TopicListener.DataFromTopic(null, gson.toJson(ev).getBytes(), false);
     }
 
@@ -284,12 +266,7 @@ public abstract class JobDataDistributor {
     private Mono<String> handleError(Throwable t) {
         logger.warn("exception: {} job: {}", t.getMessage(), job.getId());
         this.errorStats.handleException(t);
-        if (this.errorStats.isItHopeless()) {
-            logger.error("Giving up: {} job: {}", t.getMessage(), job.getId());
-            return Mono.error(t);
-        } else {
-            return Mono.empty(); // Ignore
-        }
+        return Mono.empty(); // Ignore
     }
 
     private void handleSentOk(String data) {

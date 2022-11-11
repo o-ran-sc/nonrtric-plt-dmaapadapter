@@ -98,10 +98,12 @@ class FileStore implements DataStore {
     public Mono<Boolean> createLock(String name) {
         File file = path(name).toFile();
         try {
+            Files.createDirectories(path(name).getParent());
             boolean res = file.createNewFile();
             return Mono.just(res);
         } catch (Exception e) {
-            return Mono.just(file.exists());
+            logger.warn("Could not create lock file: {}, reason: {}", file.getPath(), e.getMessage());
+            return Mono.just(!file.exists());
         }
     }
 

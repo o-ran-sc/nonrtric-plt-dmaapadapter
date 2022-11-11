@@ -218,22 +218,35 @@ class S3ObjectStore implements DataStore {
         return Mono.fromFuture(future);
     }
 
-    private Flux<S3Object> listObjectsInBucket(String bucket, String prefix) {
-        ListObjectsRequest listObjectsRequest = ListObjectsRequest.builder() //
+    private Mono<ListObjectsResponse> listObjectsRequest(String bucket, String prefix,
+            ListObjectsResponse prevResponse) {
+        ListObjectsRequest.Builder builder = ListObjectsRequest.builder() //
                 .bucket(bucket) //
-                .maxKeys(1100) //
-                .prefix(prefix) //
-                .build();
-        CompletableFuture<ListObjectsResponse> future = s3AsynchClient.listObjects(listObjectsRequest);
+                .maxKeys(1000) //
+                .prefix(prefix);
 
-        return Mono.fromFuture(future) //
+        if (prevResponse != null) {
+            if (Boolean.TRUE.equals(prevResponse.isTruncated())) {
+                builder.marker(prevResponse.nextMarker());
+            } else {
+                return Mono.empty();
+            }
+        }
+
+        ListObjectsRequest listObjectsRequest = builder.build();
+        CompletableFuture<ListObjectsResponse> future = s3AsynchClient.listObjects(listObjectsRequest);
+        return Mono.fromFuture(future);
+    }
+
+    private Flux<S3Object> listObjectsInBucket(String bucket, String prefix) {
+
+        return listObjectsRequest(bucket, prefix, null) //
+                .expand(response -> listObjectsRequest(bucket, prefix, response)) //
                 .map(ListObjectsResponse::contents) //
                 .doOnNext(f -> logger.debug("Found objects in {}: {}", bucket, f.size())) //
                 .doOnError(t -> logger.warn("Error fromlist objects: {}", t.getMessage())) //
-                .flatMapMany(Flux::fromIterable) //
-                .doOnNext(obj -> logger.debug("Found object: {}", obj.key())) //
-
-        ;
+                .flatMap(Flux::fromIterable) //
+                .doOnNext(obj -> logger.debug("Found object: {}", obj.key()));
     }
 
     private Mono<byte[]> getDataFromS3Object(String bucket, String key) {
