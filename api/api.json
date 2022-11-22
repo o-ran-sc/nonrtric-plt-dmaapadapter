@@ -97,25 +97,25 @@
             ],
             "properties": {
                 "noOfSentObjects": {
-                    "format": "int32",
+                    "format": "int64",
                     "type": "integer"
                 },
                 "jobId": {"type": "string"},
                 "outputTopic": {"type": "string"},
                 "noOfSentBytes": {
-                    "format": "int32",
+                    "format": "int64",
                     "type": "integer"
                 },
                 "clientId": {"type": "string"},
                 "groupId": {"type": "string"},
                 "noOfReceivedBytes": {
-                    "format": "int32",
+                    "format": "int64",
                     "type": "integer"
                 },
                 "typeId": {"type": "string"},
                 "inputTopic": {"type": "string"},
                 "noOfReceivedObjects": {
-                    "format": "int32",
+                    "format": "int64",
                     "type": "integer"
                 }
             }

@@ -27,6 +27,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
+import lombok.Setter;
+
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
@@ -53,10 +55,14 @@ public class KafkaTopicListener implements TopicListener {
     private static com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
     private final DataStore dataStore;
 
+    @Setter
+    private String kafkaGroupId;
+
     public KafkaTopicListener(ApplicationConfig applConfig, InfoType type) {
         this.applicationConfig = applConfig;
         this.type = type;
         this.dataStore = DataStore.create(applConfig);
+        this.kafkaGroupId = this.type.getKafkaGroupId();
     }
 
     @Override
@@ -80,7 +86,7 @@ public class KafkaTopicListener implements TopicListener {
                         sig -> logger.error("KafkaTopicListener stopped, type: {}, reason: {}", this.type.getId(), sig)) //
                 .filter(t -> t.value().length > 0 || t.key().length > 0) //
                 .map(input -> new DataFromTopic(input.key(), input.value(), DataFromTopic.findZipped(input.headers()))) //
-                .flatMap(data -> getDataFromFileIfNewPmFileEvent(data, type, dataStore), 100) //
+                .flatMap(data -> getDataFromFileIfNewPmFileEvent(data, type, dataStore)) //
                 .publish() //
                 .autoConnect(1);
     }
@@ -90,12 +96,15 @@ public class KafkaTopicListener implements TopicListener {
         if (this.applicationConfig.getKafkaBootStrapServers().isEmpty()) {
             logger.error("No kafka boostrap server is setup");
         }
+
+        consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, this.applicationConfig.getKafkaBootStrapServers());
-        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, this.type.getKafkaGroupId());
+        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, kafkaGroupId);
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
         consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId);
+
+        consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId + "_" + kafkaGroupId);
 
         return ReceiverOptions.<byte[], byte[]>create(consumerProps)
                 .subscription(Collections.singleton(this.type.getKafkaInputTopic()));

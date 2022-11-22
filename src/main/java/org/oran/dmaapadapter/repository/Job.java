@@ -71,19 +71,19 @@ public class Job {
 
         @JsonProperty(value = "noOfReceivedObjects", required = true)
         @Builder.Default
-        int noOfReceivedObjects = 0;
+        long noOfReceivedObjects = 0;
 
         @JsonProperty(value = "noOfReceivedBytes", required = true)
         @Builder.Default
-        int noOfReceivedBytes = 0;
+        long noOfReceivedBytes = 0;
 
         @JsonProperty(value = "noOfSentObjects", required = true)
         @Builder.Default
-        int noOfSentObjects = 0;
+        long noOfSentObjects = 0;
 
         @JsonProperty(value = "noOfSentBytes", required = true)
         @Builder.Default
-        int noOfSentBytes = 0;
+        long noOfSentBytes = 0;
 
         public void received(byte[] bytes) {
             noOfReceivedBytes += bytes.length;

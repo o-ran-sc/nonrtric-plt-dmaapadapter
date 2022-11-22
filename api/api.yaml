@@ -530,28 +530,28 @@ components:
       properties:
         noOfSentObjects:
           type: integer
-          format: int32
+          format: int64
         jobId:
           type: string
         outputTopic:
           type: string
         noOfSentBytes:
           type: integer
-          format: int32
+          format: int64
         clientId:
           type: string
         groupId:
           type: string
         noOfReceivedBytes:
           type: integer
-          format: int32
+          format: int64
         typeId:
           type: string
         inputTopic:
           type: string
         noOfReceivedObjects:
           type: integer
-          format: int32
+          format: int64
       description: Statistics information for one job
     statistics_info:
       type: object
