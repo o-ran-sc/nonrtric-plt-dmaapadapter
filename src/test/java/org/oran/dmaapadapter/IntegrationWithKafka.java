@@ -203,16 +203,17 @@ class IntegrationWithKafka {
         }
 
         private TopicListener.DataFromTopic unzip(TopicListener.DataFromTopic receivedKafkaOutput) {
-            if (this.applicationConfig.isZipOutput() != receivedKafkaOutput.isZipped) {
-                logger.error("********* ERROR received zipped: {}, exp zipped: {}", receivedKafkaOutput.isZipped,
+            if (this.applicationConfig.isZipOutput() != receivedKafkaOutput.isZipped()) {
+                logger.error("********* ERROR received zipped: {}, exp zipped: {}", receivedKafkaOutput.isZipped(),
                         this.applicationConfig.isZipOutput());
             }
-            if (!receivedKafkaOutput.isZipped) {
+
+            if (!receivedKafkaOutput.isZipped()) {
                 return receivedKafkaOutput;
             }
             try {
                 byte[] unzipped = KafkaTopicListener.unzip(receivedKafkaOutput.value);
-                return new TopicListener.DataFromTopic(unzipped, receivedKafkaOutput.key, false);
+                return new TopicListener.DataFromTopic("typeId", null, unzipped, receivedKafkaOutput.key);
             } catch (IOException e) {
                 logger.error("********* ERROR ", e.getMessage());
                 return null;
@@ -222,7 +223,10 @@ class IntegrationWithKafka {
         private void set(TopicListener.DataFromTopic receivedKafkaOutput) {
             this.receivedKafkaOutput = receivedKafkaOutput;
             this.count++;
-            logger.debug("*** received data on topic: {}", OUTPUT_TOPIC);
+            if (logger.isDebugEnabled()) {
+                logger.debug("*** received data on topic: {}", OUTPUT_TOPIC);
+                logger.debug("*** received typeId: {}", receivedKafkaOutput.getTypeIdFromHeaders());
+            }
         }
 
         synchronized String lastKey() {
@@ -234,7 +238,7 @@ class IntegrationWithKafka {
         }
 
         void reset() {
-            this.receivedKafkaOutput = new TopicListener.DataFromTopic(null, null, false);
+            this.receivedKafkaOutput = new TopicListener.DataFromTopic("", null, null, null);
             this.count = 0;
         }
     }
@@ -494,9 +498,11 @@ class IntegrationWithKafka {
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         // Create two jobs. One buffering and one with a filter
-        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ofMillis(400), 10), JOB_ID1, restClient());
         this.icsSimulatorController.addJob(consumerJobInfo("^Message_1$", Duration.ZERO, 0), JOB_ID2, restClient());
+        this.icsSimulatorController.addJob(consumerJobInfo(null, Duration.ofMillis(400), 10), JOB_ID1, restClient());
+
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
+
         waitForKafkaListener();
 
         var dataToSend = Flux.range(1, 3).map(i -> kafkaSenderRecord("Message_" + i, "", KAFKA_TYPE_ID)); // Message_1,
@@ -622,7 +628,7 @@ class IntegrationWithKafka {
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        final int NO_OF_COUNTERS = 5;
+        final int NO_OF_COUNTERS = 2;
         for (int i = 0; i < NO_OF_COUNTERS; ++i) {
             filterData.getMeasTypes().add("pmCounterNumber" + i);
         }
@@ -678,34 +684,32 @@ class IntegrationWithKafka {
 
     @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
     @Test
-    void kafkaCharacteristics_onePmJobs_sharedTopic() throws Exception {
+    void kafkaCharacteristics_manyPmJobs_sharedTopic() throws Exception {
         // Filter PM reports and sent to many jobs over Kafka
 
-        this.applicationConfig.setZipOutput(true);
+        this.applicationConfig.setZipOutput(false);
 
         // Register producer, Register types
         await().untilAsserted(() -> assertThat(icsSimulatorController.testResults.registrationInfo).isNotNull());
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
-        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        final int NO_OF_COUNTERS = 0;
-        for (int i = 0; i < NO_OF_COUNTERS; ++i) {
-            filterData.getMeasTypes().add("pmCounterNumber" + i);
-        }
-        filterData.getMeasObjClass().add("NRCellCU");
-
-        final String outputTopic = "kafkaCharacteristics_onePmJobs_manyReceivers";
-        this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData), outputTopic, restClient());
-
-        final int NO_OF_RECEIVERS = 150;
+        final int NO_OF_JOBS = 150;
         ArrayList<KafkaReceiver> receivers = new ArrayList<>();
-        for (int i = 0; i < NO_OF_RECEIVERS; ++i) {
+        for (int i = 0; i < NO_OF_JOBS; ++i) {
+            final String outputTopic = "kafkaCharacteristics_onePmJobs_manyReceivers";
+            final String jobId = "manyJobs_" + i;
+            PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+            filterData.getMeasTypes().add("pmCounterNumber" + i); // all counters will be added
+            filterData.getMeasObjClass().add("NRCellCU");
+
+            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData), jobId, restClient());
+
             KafkaReceiver receiver =
                     new KafkaReceiver(this.applicationConfig, outputTopic, this.securityContext, "group_" + i);
             receivers.add(receiver);
         }
 
-        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
+        await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(NO_OF_JOBS));
         waitForKafkaListener();
 
         final int NO_OF_OBJECTS = 1000;

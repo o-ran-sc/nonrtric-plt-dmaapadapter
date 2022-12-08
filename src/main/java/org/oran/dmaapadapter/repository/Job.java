@@ -207,7 +207,7 @@ public class Job {
     public Filter.FilteredData filter(DataFromTopic data) {
         if (filter == null) {
             logger.debug("No filter used");
-            return new Filter.FilteredData(data.key, data.value);
+            return new Filter.FilteredData(data.infoTypeId, data.key, data.value);
         }
         return filter.filter(data);
     }

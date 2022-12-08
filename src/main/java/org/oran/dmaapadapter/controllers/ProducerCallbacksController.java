@@ -97,7 +97,7 @@ public class ProducerCallbacksController {
             logger.warn("jobCreatedCallback failed: {}", e.getMessage());
             return ErrorResponse.create(e, e.getHttpStatus());
         } catch (Exception e) {
-            logger.warn("jobCreatedCallback failed: {}", e.getMessage());
+            logger.warn("jobCreatedCallback failed: {}", e.getMessage(), e);
             return ErrorResponse.create(e, HttpStatus.BAD_REQUEST);
         }
     }

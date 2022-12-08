@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -61,17 +62,35 @@ public class PmReportFilter implements Filter {
 
     @Getter
     public static class FilterData {
-        final Collection<String> sourceNames = new HashSet<>();
-        final Collection<String> measObjInstIds = new ArrayList<>();
-        final Collection<String> measTypes = new HashSet<>();
-        final Collection<String> measuredEntityDns = new ArrayList<>();
-        final Collection<String> measObjClass = new HashSet<>();
+        final Set<String> sourceNames = new HashSet<>();
+        final Set<String> measObjInstIds = new HashSet<>();
+        final Set<String> measTypes = new HashSet<>();
+        final Set<String> measuredEntityDns = new HashSet<>();
+        final Set<String> measObjClass = new HashSet<>();
 
         @Setter
         String pmRopStartTime;
 
         @Setter
         String pmRopEndTime;
+
+        public void addAll(FilterData other) {
+            addAll(other.sourceNames, sourceNames);
+            addAll(other.measObjInstIds, measObjInstIds);
+            addAll(other.measTypes, measTypes);
+            addAll(other.measuredEntityDns, measuredEntityDns);
+            addAll(other.measObjClass, measObjClass);
+        }
+
+        private void addAll(Set<String> source, Set<String> dst) {
+            if (source.isEmpty()) {
+                dst.clear();
+            } else if (dst.isEmpty()) {
+                // Nothing, this means 'match all'
+            } else {
+                dst.addAll(source);
+            }
+        }
     }
 
     private static class MeasTypesIndexed extends PmReport.MeasTypes {
@@ -108,7 +127,7 @@ public class PmReportFilter implements Filter {
             if (reportFiltered == null) {
                 return FilteredData.empty();
             }
-            return new FilteredData(data.key, gson.toJson(reportFiltered).getBytes());
+            return new FilteredData(data.infoTypeId, data.key, gson.toJson(reportFiltered).getBytes());
         } catch (Exception e) {
             logger.warn("Could not parse PM data. {}, reason: {}", data, e.getMessage());
             return FilteredData.empty();

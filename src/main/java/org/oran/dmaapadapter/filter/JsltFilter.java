@@ -49,7 +49,7 @@ class JsltFilter implements Filter {
     @Override
     public FilteredData filter(DataFromTopic data) {
         if (expression == null) {
-            return new FilteredData(data.key, data.value);
+            return new FilteredData(data.infoTypeId, data.key, data.value);
         }
         try {
             JsonFactory factory = mapper.getFactory();
@@ -60,7 +60,7 @@ class JsltFilter implements Filter {
             if (filteredNode == NullNode.instance) {
                 return FilteredData.empty();
             }
-            return new FilteredData(data.key, mapper.writeValueAsBytes(filteredNode));
+            return new FilteredData(data.infoTypeId, data.key, mapper.writeValueAsBytes(filteredNode));
         } catch (Exception e) {
             return FilteredData.empty();
         }

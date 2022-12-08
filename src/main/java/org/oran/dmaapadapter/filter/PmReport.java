@@ -43,9 +43,6 @@ public class PmReport {
         private String eventId;
 
         @Expose
-        private int sequence;
-
-        @Expose
         private String eventName;
 
         @Expose
@@ -56,22 +53,19 @@ public class PmReport {
         private String reportingEntityName;
 
         @Expose
-        private String priority;
-
-        @Expose
         private long startEpochMicrosec;
 
         @Expose
         private long lastEpochMicrosec;
 
         @Expose
-        private String version;
-
-        @Expose
-        private String vesEventListenerVersion;
-
-        @Expose
         private String timeZoneOffset;
+
+        /* Not reported elements */
+        int sequence;
+        String priority;
+        String version;
+        String vesEventListenerVersion;
     }
 
     public static class MeasInfoId {
