@@ -54,9 +54,9 @@ public class ConsumerController {
 
     public static class TestResults {
 
-        public List<String> receivedBodies = Collections.synchronizedList(new ArrayList<String>());
+        public final List<String> receivedBodies = Collections.synchronizedList(new ArrayList<String>());
 
-        public List<Map<String, String>> receivedHeaders =
+        public final List<Map<String, String>> receivedHeaders =
                 Collections.synchronizedList(new ArrayList<Map<String, String>>());
 
         public TestResults() {}

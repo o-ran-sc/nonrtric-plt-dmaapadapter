@@ -42,12 +42,12 @@ class RegexpFilter implements Filter {
     @Override
     public FilteredData filter(DataFromTopic data) {
         if (regexp == null) {
-            return new FilteredData(data.key, data.value);
+            return new FilteredData(data.infoTypeId, data.key, data.value);
         }
         Matcher matcher = regexp.matcher(data.valueAsString());
         boolean match = matcher.find();
         if (match) {
-            return new FilteredData(data.key, data.value);
+            return new FilteredData(data.infoTypeId, data.key, data.value);
         } else {
             return FilteredData.empty();
         }

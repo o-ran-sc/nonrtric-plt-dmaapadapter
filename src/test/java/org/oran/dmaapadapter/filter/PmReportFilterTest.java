@@ -99,7 +99,8 @@ class PmReportFilterTest {
 
     private String filterReport(PmReportFilter filter) throws Exception {
 
-        TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes(), false);
+        TopicListener.DataFromTopic data =
+                new TopicListener.DataFromTopic("typeId", null, null, loadReport().getBytes());
         FilteredData filtered = filter.filter(data);
 
         String reportAfterFilter = gson.toJson(data.getCachedPmReport());
@@ -156,7 +157,8 @@ class PmReportFilterTest {
         }
 
         {
-            TopicListener.DataFromTopic data = new TopicListener.DataFromTopic(null, loadReport().getBytes(), false);
+            TopicListener.DataFromTopic data =
+                    new TopicListener.DataFromTopic("typeId", null, null, loadReport().getBytes());
 
             PmReportFilter.FilterData utranCellFilter = new PmReportFilter.FilterData();
             utranCellFilter.measObjClass.add("UtranCell");
@@ -213,7 +215,7 @@ class PmReportFilterTest {
             filterData.getMeasTypes().add("pmCounterNumber0");
             filterData.getMeasObjClass().add("NRCellCU");
             PmReportFilter filter = new PmReportFilter(filterData);
-            DataFromTopic topicData = new DataFromTopic(null, pmReportJson.getBytes(), false);
+            DataFromTopic topicData = new DataFromTopic("typeId", null, null, pmReportJson.getBytes());
 
             Instant startTime = Instant.now();
             for (int i = 0; i < TIMES; ++i) {
@@ -266,10 +268,11 @@ class PmReportFilterTest {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         PmReportFilter filter = new PmReportFilter(filterData);
 
-        FilteredData filtered = filter.filter(new TopicListener.DataFromTopic(null, "junk".getBytes(), false));
+        FilteredData filtered = filter.filter(new TopicListener.DataFromTopic("typeId", null, null, "junk".getBytes()));
         assertThat(filtered.isEmpty()).isTrue();
 
-        filtered = filter.filter(new TopicListener.DataFromTopic(null, reQuote("{'msg': 'test'}").getBytes(), false));
+        filtered = filter
+                .filter(new TopicListener.DataFromTopic("typeId", null, null, reQuote("{'msg': 'test'}").getBytes()));
         assertThat(filtered.isEmpty()).isTrue();
 
     }

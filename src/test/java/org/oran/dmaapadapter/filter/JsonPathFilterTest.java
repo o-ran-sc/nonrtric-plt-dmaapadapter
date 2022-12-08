@@ -36,7 +36,7 @@ class JsonPathFilterTest {
     void testJsonPath() throws Exception {
         String exp = ("$.event.perf3gppFields.measDataCollection.measInfoList[0].measTypes.sMeasTypesList[0]");
         JsonPathFilter filter = new JsonPathFilter(exp);
-        DataFromTopic data = new DataFromTopic(null, loadReport().getBytes(), false);
+        DataFromTopic data = new DataFromTopic("typeId", null, null, loadReport().getBytes());
         FilteredData filtered = filter.filter(data);
         String res = filtered.getValueAString();
         assertThat(res).isEqualTo("\"attTCHSeizures\"");
