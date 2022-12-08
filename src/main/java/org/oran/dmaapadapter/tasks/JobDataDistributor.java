@@ -34,6 +34,9 @@ import org.oran.dmaapadapter.datastore.DataStore;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.repository.Job;
+import org.oran.dmaapadapter.repository.Jobs.JobGroup;
+import org.oran.dmaapadapter.repository.Jobs.JobGroupPm;
+import org.oran.dmaapadapter.repository.Jobs.JobGroupSingle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +53,7 @@ public abstract class JobDataDistributor {
     private static final Logger logger = LoggerFactory.getLogger(JobDataDistributor.class);
 
     @Getter
-    private final Job job;
+    private final JobGroup jobGroup;
     private Disposable subscription;
     private final ErrorStats errorStats = new ErrorStats();
 
@@ -71,55 +74,64 @@ public abstract class JobDataDistributor {
         }
     }
 
-    protected JobDataDistributor(Job job, ApplicationConfig applConfig) {
+    protected JobDataDistributor(JobGroup jobGroup, ApplicationConfig applConfig) {
         this.applConfig = applConfig;
-        this.job = job;
+        this.jobGroup = jobGroup;
         this.dataStore = DataStore.create(applConfig);
         this.dataStore.create(DataStore.Bucket.FILES).subscribe();
         this.dataStore.create(DataStore.Bucket.LOCKS).subscribe();
     }
 
     public void start(Flux<TopicListener.DataFromTopic> input) {
-        logger.debug("Starting distribution, job: {}, to topic: {}", this.job.getId(),
-                job.getParameters().getKafkaOutputTopic());
-        PmReportFilter filter = job.getFilter() instanceof PmReportFilter ? (PmReportFilter) job.getFilter() : null;
-
+        logger.debug("Starting distribution, to topic: {}", jobGroup.getId());
+        PmReportFilter filter = getPmReportFilter(this.jobGroup);
         if (filter == null || filter.getFilterData().getPmRopEndTime() == null) {
-            this.subscription = filterAndBuffer(input, this.job) //
+            this.subscription = filterAndBuffer(input, this.jobGroup) //
                     .flatMap(this::sendToClient) //
                     .onErrorResume(this::handleError) //
                     .subscribe(this::handleSentOk, //
                             this::handleExceptionInStream, //
-                            () -> logger.warn("JobDataDistributor stopped jobId: {}", job.getId()));
+                            () -> logger.warn("JobDataDistributor stopped jobId: {}", jobGroup.getId()));
         }
 
         if (filter != null && filter.getFilterData().getPmRopStartTime() != null) {
             this.dataStore.createLock(collectHistoricalDataLockName()) //
                     .doOnNext(isLockGranted -> {
                         if (isLockGranted.booleanValue()) {
-                            logger.debug("Checking historical PM ROP files, jobId: {}", this.job.getId());
+                            logger.debug("Checking historical PM ROP files, jobId: {}", this.jobGroup.getId());
                         } else {
                             logger.debug("Skipping check of historical PM ROP files, already done. jobId: {}",
-                                    this.job.getId());
+                                    this.jobGroup.getId());
                         }
                     }) //
                     .filter(isLockGranted -> isLockGranted) //
                     .flatMapMany(b -> Flux.fromIterable(filter.getFilterData().getSourceNames())) //
                     .doOnNext(sourceName -> logger.debug("Checking source name: {}, jobId: {}", sourceName,
-                            this.job.getId())) //
+                            this.jobGroup.getId())) //
                     .flatMap(sourceName -> dataStore.listObjects(DataStore.Bucket.FILES, sourceName), 1) //
                     .filter(this::isRopFile) //
                     .filter(fileName -> filterStartTime(filter.getFilterData(), fileName)) //
                     .filter(fileName -> filterEndTime(filter.getFilterData(), fileName)) //
                     .map(this::createFakeEvent) //
-                    .flatMap(data -> KafkaTopicListener.getDataFromFileIfNewPmFileEvent(data, this.job.getType(),
+                    .flatMap(data -> KafkaTopicListener.getDataFromFileIfNewPmFileEvent(data, this.jobGroup.getType(),
                             dataStore), 100)
-                    .map(job::filter) //
+                    .map(jobGroup::filter) //
                     .map(this::gzip) //
                     .flatMap(this::sendToClient, 1) //
                     .onErrorResume(this::handleCollectHistoricalDataError) //
                     .subscribe();
         }
+    }
+
+    private static PmReportFilter getPmReportFilter(JobGroup jobGroup) {
+
+        if (jobGroup instanceof JobGroupPm) {
+            return ((JobGroupPm) jobGroup).getFilter();
+        } else if (jobGroup instanceof JobGroupSingle) {
+            Filter f = ((JobGroupSingle) jobGroup).getJob().getFilter();
+            return (f instanceof PmReportFilter) ? (PmReportFilter) f : null;
+        }
+        return null;
     }
 
     private Filter.FilteredData gzip(Filter.FilteredData data) {
@@ -131,7 +143,7 @@ public abstract class JobDataDistributor {
                 gzip.flush();
                 gzip.close();
                 byte[] zipped = out.toByteArray();
-                return new Filter.FilteredData(data.key, zipped, true);
+                return new Filter.FilteredData(data.infoTypeId, data.key, zipped, true);
             } catch (IOException e) {
                 logger.error("Unexpected exception when zipping: {}", e.getMessage());
                 return data;
@@ -142,30 +154,28 @@ public abstract class JobDataDistributor {
     }
 
     private Mono<String> handleCollectHistoricalDataError(Throwable t) {
-        logger.error("Exception: {} job: {}", t.getMessage(), job.getId());
+        logger.error("Exception: {} job: {}", t.getMessage(), jobGroup.getId());
         return tryDeleteLockFile() //
                 .map(bool -> "OK");
     }
 
     private String collectHistoricalDataLockName() {
-        return "collectHistoricalDataLock" + this.job.getId();
+        return "collectHistoricalDataLock" + this.jobGroup.getId();
     }
 
     private TopicListener.DataFromTopic createFakeEvent(String fileName) {
         NewFileEvent ev = new NewFileEvent(fileName);
-        return new TopicListener.DataFromTopic(null, gson.toJson(ev).getBytes(), false);
+        return new TopicListener.DataFromTopic(this.jobGroup.getType().getId(), null, null, gson.toJson(ev).getBytes());
     }
 
     private static String fileTimePartFromRopFileName(String fileName) {
+        // "O-DU-1122/A20000626.2315+0200-2330+0200_HTTPS-6-73.json"
         return fileName.substring(fileName.lastIndexOf("/") + 2);
     }
 
     private static boolean filterStartTime(PmReportFilter.FilterData filter, String fileName) {
-        // A20000626.2315+0200-2330+0200_HTTPS-6-73.json
         try {
-            String fileTimePart = fileTimePartFromRopFileName(fileName);
-            fileTimePart = fileTimePart.substring(0, 18);
-            OffsetDateTime fileStartTime = parseFileDate(fileTimePart);
+            OffsetDateTime fileStartTime = getStartTimeFromFileName(fileName);
             OffsetDateTime startTime = OffsetDateTime.parse(filter.getPmRopStartTime());
             boolean isMatch = fileStartTime.isAfter(startTime);
             logger.debug("Checking file: {}, fileStartTime: {}, filterStartTime: {}, isAfter: {}", fileName,
@@ -182,14 +192,11 @@ public abstract class JobDataDistributor {
     }
 
     private static boolean filterEndTime(PmReportFilter.FilterData filter, String fileName) {
-        // A20000626.2315+0200-2330+0200_HTTPS-6-73.json
         if (filter.getPmRopEndTime() == null) {
             return true;
         }
         try {
-            String fileTimePart = fileTimePartFromRopFileName(fileName);
-            fileTimePart = fileTimePart.substring(0, 9) + fileTimePart.substring(19, 28);
-            OffsetDateTime fileEndTime = parseFileDate(fileTimePart);
+            OffsetDateTime fileEndTime = getEndTimeFromFileName(fileName);
             OffsetDateTime endTime = OffsetDateTime.parse(filter.getPmRopEndTime());
             boolean isMatch = fileEndTime.isBefore(endTime);
             logger.debug("Checking file: {}, fileEndTime: {}, endTime: {}, isBefore: {}", fileName, fileEndTime,
@@ -202,6 +209,20 @@ public abstract class JobDataDistributor {
         }
     }
 
+    private static OffsetDateTime getStartTimeFromFileName(String fileName) {
+        String fileTimePart = fileTimePartFromRopFileName(fileName);
+        // A20000626.2315+0200-2330+0200_HTTPS-6-73.json
+        fileTimePart = fileTimePart.substring(0, 18);
+        return parseFileDate(fileTimePart);
+    }
+
+    private static OffsetDateTime getEndTimeFromFileName(String fileName) {
+        String fileTimePart = fileTimePartFromRopFileName(fileName);
+        // A20000626.2315+0200-2330+0200_HTTPS-6-73.json
+        fileTimePart = fileTimePart.substring(0, 9) + fileTimePart.substring(19, 28);
+        return parseFileDate(fileTimePart);
+    }
+
     private static OffsetDateTime parseFileDate(String timeStr) {
         DateTimeFormatter startTimeFormatter =
                 new DateTimeFormatterBuilder().appendPattern("yyyyMMdd.HHmmZ").toFormatter();
@@ -209,14 +230,14 @@ public abstract class JobDataDistributor {
     }
 
     private void handleExceptionInStream(Throwable t) {
-        logger.warn("JobDataDistributor exception: {}, jobId: {}", t.getMessage(), job.getId());
+        logger.warn("JobDataDistributor exception: {}, jobId: {}", t.getMessage(), jobGroup.getId());
     }
 
     protected abstract Mono<String> sendToClient(Filter.FilteredData output);
 
     public synchronized void stop() {
         if (this.subscription != null) {
-            logger.debug("Stopped, job: {}", job.getId());
+            logger.debug("Stopped, job: {}", jobGroup.getId());
             this.subscription.dispose();
             this.subscription = null;
         }
@@ -233,23 +254,26 @@ public abstract class JobDataDistributor {
         return this.subscription != null;
     }
 
-    private Flux<Filter.FilteredData> filterAndBuffer(Flux<TopicListener.DataFromTopic> inputFlux, Job job) {
+    private Flux<Filter.FilteredData> filterAndBuffer(Flux<TopicListener.DataFromTopic> inputFlux, JobGroup jobGroup) {
         Flux<Filter.FilteredData> filtered = //
                 inputFlux //
-                        .doOnNext(data -> logger.trace("Received data, job {}", job.getId())) //
-                        .doOnNext(data -> job.getStatistics().received(data.value)) //
-                        .map(job::filter) //
+                        .doOnNext(data -> logger.trace("Received data, job {}", jobGroup.getId())) //
+                        .doOnNext(data -> jobGroup.getJobs().forEach(job -> job.getStatistics().received(data.value))) //
+                        .map(jobGroup::filter) //
                         .map(this::gzip) //
                         .filter(f -> !f.isEmpty()) //
-                        .doOnNext(f -> job.getStatistics().filtered(f.value)) //
-                        .doOnNext(data -> logger.trace("Filtered data, job {}", job.getId())); //
+                        .doOnNext(f -> jobGroup.getJobs().forEach(job -> job.getStatistics().filtered(f.value))) //
+                        .doOnNext(data -> logger.trace("Filtered data, job {}", jobGroup.getId())) //
+        ; //
 
+        Job job = jobGroup.getJobs().iterator().next();
         if (job.isBuffered()) {
             filtered = filtered.map(input -> quoteNonJson(input.getValueAString(), job)) //
                     .bufferTimeout( //
                             job.getParameters().getBufferTimeout().getMaxSize(), //
                             job.getParameters().getBufferTimeout().getMaxTime()) //
-                    .map(buffered -> new Filter.FilteredData(null, buffered.toString().getBytes()));
+                    .map(buffered -> new Filter.FilteredData(this.getJobGroup().getType().getId(), null,
+                            buffered.toString().getBytes()));
         }
         return filtered;
     }
@@ -264,7 +288,7 @@ public abstract class JobDataDistributor {
     }
 
     private Mono<String> handleError(Throwable t) {
-        logger.warn("exception: {} job: {}", t.getMessage(), job.getId());
+        logger.warn("exception: {} job: {}", t.getMessage(), jobGroup.getId());
         this.errorStats.handleException(t);
         return Mono.empty(); // Ignore
     }

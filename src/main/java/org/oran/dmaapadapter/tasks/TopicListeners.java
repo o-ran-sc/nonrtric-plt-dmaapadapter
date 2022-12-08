@@ -30,8 +30,8 @@ import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.repository.InfoType;
 import org.oran.dmaapadapter.repository.InfoTypes;
-import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
+import org.oran.dmaapadapter.repository.Jobs.JobGroup;
 import org.oran.dmaapadapter.repository.MultiMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,52 +70,52 @@ public class TopicListeners {
 
         jobs.addObserver(new Jobs.Observer() {
             @Override
-            public void onJobbAdded(Job job) {
-                addJob(job);
+            public void onJobbGroupAdded(JobGroup jobGroup) {
+                addJob(jobGroup);
             }
 
             @Override
-            public void onJobRemoved(Job job) {
-                removeJob(job);
+            public void onJobGroupRemoved(JobGroup jobGroup) {
+                removeDistributor(jobGroup);
             }
         });
     }
 
-    public synchronized void addJob(Job job) {
-        removeJob(job);
-        logger.debug("Job added {}", job.getId());
-        if (job.getType().isKafkaTopicDefined()) {
-            addConsumer(job, dataDistributors, kafkaTopicListeners);
+    public synchronized void addJob(JobGroup jobGroup) {
+        removeDistributor(jobGroup);
+        logger.debug("Job added {}", jobGroup.getId());
+        if (jobGroup.getType().isKafkaTopicDefined()) {
+            addDistributor(jobGroup, dataDistributors, kafkaTopicListeners);
         }
 
-        if (job.getType().isDmaapTopicDefined()) {
-            addConsumer(job, dataDistributors, dmaapTopicListeners);
+        if (jobGroup.getType().isDmaapTopicDefined()) {
+            addDistributor(jobGroup, dataDistributors, dmaapTopicListeners);
         }
     }
 
-    private JobDataDistributor createConsumer(Job job) {
-        return !Strings.isEmpty(job.getParameters().getKafkaOutputTopic()) ? new KafkaJobDataDistributor(job, appConfig)
-                : new HttpJobDataDistributor(job, appConfig);
+    private JobDataDistributor createDistributor(JobGroup jobGroup) {
+        return !Strings.isEmpty(jobGroup.getTopic()) ? new KafkaJobDataDistributor(jobGroup, appConfig)
+                : new HttpJobDataDistributor(jobGroup, appConfig);
     }
 
-    private void addConsumer(Job job, MultiMap<JobDataDistributor> distributors,
+    private void addDistributor(JobGroup jobGroup, MultiMap<JobDataDistributor> distributors,
             Map<String, TopicListener> topicListeners) {
-        TopicListener topicListener = topicListeners.get(job.getType().getId());
-        JobDataDistributor distributor = createConsumer(job);
+        TopicListener topicListener = topicListeners.get(jobGroup.getType().getId());
+        JobDataDistributor distributor = createDistributor(jobGroup);
 
         distributor.start(topicListener.getFlux());
 
-        distributors.put(job.getType().getId(), job.getId(), distributor);
+        distributors.put(jobGroup.getType().getId(), jobGroup.getId(), distributor);
     }
 
-    public synchronized void removeJob(Job job) {
-        removeJob(job, dataDistributors);
+    public synchronized void removeDistributor(JobGroup jobGroup) {
+        removeDistributor(jobGroup, dataDistributors);
     }
 
-    private static void removeJob(Job job, MultiMap<JobDataDistributor> distributors) {
-        JobDataDistributor distributor = distributors.remove(job.getType().getId(), job.getId());
+    private static void removeDistributor(JobGroup jobGroup, MultiMap<JobDataDistributor> distributors) {
+        JobDataDistributor distributor = distributors.remove(jobGroup.getType().getId(), jobGroup.getId());
         if (distributor != null) {
-            logger.debug("Job removed {}", job.getId());
+            logger.debug("Job removed {}", jobGroup.getId());
             distributor.stop();
         }
     }

@@ -46,7 +46,7 @@ class JsonPathFilter implements Filter {
             String str = new String(data.value);
             Object o = JsonPath.parse(str).read(this.expression, Object.class);
             String json = gson.toJson(o);
-            return o == null ? FilteredData.empty() : new FilteredData(data.key, json.getBytes());
+            return o == null ? FilteredData.empty() : new FilteredData(data.infoTypeId, data.key, json.getBytes());
         } catch (Exception e) {
             return FilteredData.empty();
         }
