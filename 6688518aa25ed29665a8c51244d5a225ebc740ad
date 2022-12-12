@@ -1,0 +1,96 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "da0d89f5_48e4b1a3",
+        "filename": "docs/overview.rst",
+        "patchSetId": 2
+      },
+      "lineNbr": 193,
+      "author": {
+        "id": 1000201
+      },
+      "writtenOn": "2022-12-12T10:13:20Z",
+      "side": 1,
+      "message": "which",
+      "range": {
+        "startLine": 193,
+        "startChar": 111,
+        "endLine": 193,
+        "endChar": 117
+      },
+      "revId": "6688518aa25ed29665a8c51244d5a225ebc740ad",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3d041ca2_53d042fa",
+        "filename": "docs/overview.rst",
+        "patchSetId": 2
+      },
+      "lineNbr": 333,
+      "author": {
+        "id": 1000201
+      },
+      "writtenOn": "2022-12-12T10:13:20Z",
+      "side": 1,
+      "message": "This line causes a verification error",
+      "range": {
+        "startLine": 333,
+        "startChar": 0,
+        "endLine": 333,
+        "endChar": 1
+      },
+      "revId": "6688518aa25ed29665a8c51244d5a225ebc740ad",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "157e2e84_7a9b90ec",
+        "filename": "docs/overview.rst",
+        "patchSetId": 2
+      },
+      "lineNbr": 334,
+      "author": {
+        "id": 1000201
+      },
+      "writtenOn": "2022-12-12T10:13:20Z",
+      "side": 1,
+      "message": "their",
+      "range": {
+        "startLine": 334,
+        "startChar": 20,
+        "endLine": 334,
+        "endChar": 24
+      },
+      "revId": "6688518aa25ed29665a8c51244d5a225ebc740ad",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "bb11b16d_14433e93",
+        "filename": "docs/overview.rst",
+        "patchSetId": 2
+      },
+      "lineNbr": 346,
+      "author": {
+        "id": 1000201
+      },
+      "writtenOn": "2022-12-12T10:13:20Z",
+      "side": 1,
+      "message": "information",
+      "range": {
+        "startLine": 346,
+        "startChar": 58,
+        "endLine": 346,
+        "endChar": 71
+      },
+      "revId": "6688518aa25ed29665a8c51244d5a225ebc740ad",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    }
+  ]
+}
