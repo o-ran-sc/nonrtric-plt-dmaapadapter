@@ -23,6 +23,7 @@ package org.oran.dmaapadapter.filter;
 import com.google.gson.GsonBuilder;
 
 import java.lang.invoke.MethodHandles;
+import java.util.Collection;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +50,14 @@ public class FilterFactory {
                 logger.error("Not handeled filter type: {}", type);
                 return null;
         }
+    }
+
+    public static PmReportFilter createAggregateFilter(Collection<PmReportFilter> filters) {
+        PmReportFilter.FilterData resultFilterData = filters.iterator().next().getFilterData();
+        for (PmReportFilter filter : filters) {
+            resultFilterData.addAll(filter.getFilterData());
+        }
+        return new PmReportFilter(resultFilterData);
     }
 
     private static PmReportFilter.FilterData createPmFilterData(Object filter) {

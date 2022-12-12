@@ -39,24 +39,26 @@ public interface Filter {
     public static class FilteredData {
         public final byte[] key;
         public final byte[] value;
+        public final String infoTypeId;
 
         @Getter
         private final boolean isZipped;
 
-        private static final FilteredData emptyData = new FilteredData(null, null);
+        private static final FilteredData emptyData = new FilteredData(null, null, null);
 
         public boolean isEmpty() {
             return (key == null || key.length == 0) && (value == null || value.length == 0);
         }
 
-        public FilteredData(byte[] key, byte[] value) {
-            this(key, value, false);
+        public FilteredData(String type, byte[] key, byte[] value) {
+            this(type, key, value, false);
         }
 
-        public FilteredData(byte[] key, byte[] value, boolean isZipped) {
+        public FilteredData(String type, byte[] key, byte[] value, boolean isZipped) {
             this.key = key;
             this.value = value;
             this.isZipped = isZipped;
+            this.infoTypeId = type;
         }
 
         public String getValueAString() {
@@ -70,9 +72,9 @@ public interface Filter {
         public Iterable<Header> headers() {
             ArrayList<Header> result = new ArrayList<>();
             if (isZipped()) {
-                Header h = new RecordHeader(DataFromTopic.ZIP_PROPERTY, null);
-                result.add(h);
+                result.add(new RecordHeader(DataFromTopic.ZIPPED_PROPERTY, null));
             }
+            result.add(new RecordHeader(DataFromTopic.TYPE_ID_PROPERTY, infoTypeId.getBytes()));
             return result;
         }
     }

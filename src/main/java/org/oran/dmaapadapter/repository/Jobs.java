@@ -29,12 +29,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
+import lombok.Getter;
+
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
 import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.exceptions.ServiceException;
+import org.oran.dmaapadapter.filter.Filter;
+import org.oran.dmaapadapter.filter.FilterFactory;
+import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.repository.Job.Parameters;
+import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,15 +50,141 @@ import org.springframework.stereotype.Component;
 @Component
 public class Jobs {
     public interface Observer {
-        void onJobbAdded(Job job);
+        void onJobbGroupAdded(JobGroup jobGroup);
 
-        void onJobRemoved(Job job);
+        void onJobGroupRemoved(JobGroup jobGroup);
+    }
+
+    public interface JobGroup {
+        public String getId();
+
+        public InfoType getType();
+
+        public void remove(Job job);
+
+        public boolean isEmpty();
+
+        public Filter.FilteredData filter(DataFromTopic data);
+
+        public Iterable<Job> getJobs();
+
+        public String getTopic();
+    }
+
+    public static class JobGroupSingle implements JobGroup {
+        @Getter
+        private final Job job;
+        private boolean isJobRemoved = false;
+
+        public JobGroupSingle(Job job) {
+            this.job = job;
+        }
+
+        @Override
+        public Filter.FilteredData filter(DataFromTopic data) {
+            return job.filter(data);
+        }
+
+        @Override
+        public void remove(Job job) {
+            this.isJobRemoved = true;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return isJobRemoved;
+        }
+
+        @Override
+        public String getId() {
+            return job.getId();
+        }
+
+        @Override
+        public InfoType getType() {
+            return job.getType();
+        }
+
+        @Override
+        public Iterable<Job> getJobs() {
+            Collection<Job> c = new ArrayList<>();
+            c.add(job);
+            return c;
+        }
+
+        @Override
+        public String getTopic() {
+            return this.job.getParameters().getKafkaOutputTopic();
+        }
+    }
+
+    public static class JobGroupPm implements JobGroup {
+        @Getter
+        private final String topic;
+
+        private Map<String, Job> jobs = new HashMap<>();
+
+        @Getter
+        private PmReportFilter filter;
+
+        @Getter
+        private final InfoType type;
+
+        public JobGroupPm(InfoType type, String topic) {
+            this.topic = topic;
+            this.type = type;
+        }
+
+        public synchronized void add(Job job) {
+            this.jobs.put(job.getId(), job);
+            this.filter = createFilter();
+        }
+
+        public synchronized void remove(Job job) {
+            this.jobs.remove(job.getId());
+            if (!this.jobs.isEmpty()) {
+                this.filter = createFilter();
+            }
+        }
+
+        public boolean isEmpty() {
+            return jobs.isEmpty();
+        }
+
+        @Override
+        public Filter.FilteredData filter(DataFromTopic data) {
+            return filter.filter(data);
+        }
+
+        public Job getAJob() {
+            if (this.jobs.isEmpty()) {
+                return null;
+            }
+            return this.jobs.values().iterator().next();
+        }
+
+        private PmReportFilter createFilter() {
+            Collection<PmReportFilter> filterData = new ArrayList<>();
+            this.jobs.forEach((key, value) -> filterData.add((PmReportFilter) value.getFilter()));
+            return FilterFactory.createAggregateFilter(filterData);
+        }
+
+        @Override
+        public String getId() {
+            return topic;
+        }
+
+        @Override
+        public Iterable<Job> getJobs() {
+            return this.jobs.values();
+        }
     }
 
     private static final Logger logger = LoggerFactory.getLogger(Jobs.class);
 
     private Map<String, Job> allJobs = new HashMap<>();
     private MultiMap<Job> jobsByType = new MultiMap<>();
+    private Map<String, JobGroup> jobGroups = new HashMap<>();
     private final AsyncRestClientFactory restclientFactory;
     private final List<Observer> observers = new ArrayList<>();
     private final ApplicationConfig appConfig;
@@ -86,9 +218,6 @@ public class Jobs {
                 : restclientFactory.createRestClientNoHttpProxy(callbackUrl);
         Job job = new Job(id, callbackUrl, type, owner, lastUpdated, parameters, consumerRestClient, this.appConfig);
         this.put(job);
-        synchronized (observers) {
-            this.observers.forEach(obs -> obs.onJobbAdded(job));
-        }
     }
 
     public void addObserver(Observer obs) {
@@ -97,10 +226,40 @@ public class Jobs {
         }
     }
 
+    private String jobGroupId(Job job) {
+        if (Strings.isNullOrEmpty(job.getParameters().getKafkaOutputTopic())) {
+            return job.getId();
+        } else if (job.getParameters().getFilterType() == Filter.Type.PM_DATA) {
+            return job.getParameters().getKafkaOutputTopic();
+        } else {
+            return job.getId();
+        }
+    }
+
     private synchronized void put(Job job) {
         logger.debug("Put job: {}", job.getId());
+        remove(job.getId());
+
         allJobs.put(job.getId(), job);
         jobsByType.put(job.getType().getId(), job.getId(), job);
+
+        if (job.getParameters().getFilterType() == Filter.Type.PM_DATA
+                && job.getParameters().getKafkaOutputTopic() != null) {
+            String topic = job.getParameters().getKafkaOutputTopic();
+            if (!this.jobGroups.containsKey(topic)) {
+                final JobGroupPm group = new JobGroupPm(job.getType(), topic);
+                this.jobGroups.put(topic, group);
+                group.add(job);
+                this.observers.forEach(obs -> obs.onJobbGroupAdded(group));
+            } else {
+                JobGroupPm group = (JobGroupPm) this.jobGroups.get(topic);
+                group.add(job);
+            }
+        } else {
+            JobGroupSingle group = new JobGroupSingle(job);
+            this.jobGroups.put(job.getId(), group);
+            this.observers.forEach(obs -> obs.onJobbGroupAdded(group));
+        }
     }
 
     public synchronized Iterable<Job> getAll() {
@@ -116,15 +275,20 @@ public class Jobs {
     }
 
     public void remove(Job job) {
+        String groupId = this.jobGroupId(job);
+        JobGroup group = this.jobGroups.get(groupId);
         synchronized (this) {
             this.allJobs.remove(job.getId());
             jobsByType.remove(job.getType().getId(), job.getId());
+            group.remove(job);
+            if (group.isEmpty()) {
+                this.jobGroups.remove(groupId);
+            }
         }
-        notifyJobRemoved(job);
-    }
 
-    private synchronized void notifyJobRemoved(Job job) {
-        this.observers.forEach(obs -> obs.onJobRemoved(job));
+        if (group.isEmpty()) {
+            this.observers.forEach(obs -> obs.onJobGroupRemoved(group));
+        }
     }
 
     public synchronized int size() {
@@ -137,7 +301,7 @@ public class Jobs {
 
     public void clear() {
 
-        this.allJobs.forEach((id, job) -> notifyJobRemoved(job));
+        this.jobGroups.forEach((id, group) -> this.observers.forEach(obs -> obs.onJobGroupRemoved(group)));
 
         synchronized (this) {
             allJobs.clear();

@@ -179,6 +179,8 @@ This schema will be registered when the configured dataType is "pmData".
 This will extend the filtering capabilities so that a special filter for PM data can be used. Here it is possible to
 define which meas-types (counters) to get from which resources.
 
+"It is possible to both filter on new data that is collected from the traffical nodes and to query from data that is already collected.
+
 The filterType parameter is extended to allow value "pmdata" which can be used for PM data filtering.
 
 * sourceNames an array of source names for wanted PM reports.
@@ -188,9 +190,11 @@ The filterType parameter is extended to allow value "pmdata" which can be used f
 * measuredEntityDns partial match of meas entity DNs.
 * measObjClass matching of the class of the measObjInstId. The measObjInstId must follow the 3GPP naming conventions for Managed Objects (3GPP TS 32.106-8).
   Example, for a distinguished name "ManagedElement=RNC-Gbg-1,ENodeBFunction=1", the MO class will be "ENodeBFunction".
+* pmRopStartTime gives a possibility to query from already collected PM files. The start file is the time from when the information shall be returned.
+  In this case, the query is only done for files from the given "sourceNames".
+  If this parameter is excluded, only "new" reports will be delivered as they are collected from the traffical nodes.
 
-All PM filter properties are optional and a non given will result in "match all".
-The result of the filtering is still following the structure of a 3GPP PM report.
+All PM filter properties are optional and a non given will result in "match all" (except the pmRopStartTime).
 
 Below follows an example of a PM filter.
 
@@ -210,6 +214,134 @@ Below follows an example of a PM filter.
         ],
         "measuredEntityDns":[
            "ManagedElement=RNC-Gbg-1"
+        ],
+        "measObjClass":[
+           "UtranCell"
+        ]
+        "pmRopStartTime" : "2022-12-13T10:50:44.000-08:00"
+      }
+    }
+
+
+Here is an example of a filter that will
+match two counters from all cells in two traffical nodes.
+
+.. code-block:: javascript
+
+    {
+      "filterType":"pmdata",
+      "filter": {
+        "sourceNames":[
+           "O-DU-1122", "O-DU-1123"
+        ],
+        "measTypes":[
+           "succImmediateAssignProcs", "attTCHSeizures"
+        ],
+        "measObjClass":[
+           "UtranCell"
         ]
       }
     }
+
+
+********************
+Bulk PM subscription
+********************
+
+The sequence is that a "new file event" is received (from a Kafka topic).
+The file is read from local storage (file storage or S3 object store). For each Job, the specified PM filter is applied to the data
+and the result is sent to the Kafka topic specified by the Job (by the data consumer).
+
+.. image:: ./dedicatedTopics.png
+   :width: 500pt
+
+The result of the PM filtering is still following the structure of a 3GPP PM report.
+Here follows an example of a resulting delivered PM report.
+
+.. code-block:: javascript
+
+   {
+      "event":{
+         "commonEventHeader":{
+            "domain":"perf3gpp",
+            "eventId":"9efa1210-f285-455f-9c6a-3a659b1f1882",
+            "eventName":"perf3gpp_gnb-Ericsson_pmMeasResult",
+            "sourceName":"O-DU-1122",
+            "reportingEntityName":"",
+            "startEpochMicrosec":951912000000,
+            "lastEpochMicrosec":951912900000,
+            "timeZoneOffset":"+00:00"
+         },
+         "perf3gppFields":{
+            "perf3gppFieldsVersion":"1.0",
+            "measDataCollection":{
+               "granularityPeriod":900,
+               "measuredEntityUserName":"RNC Telecomville",
+               "measuredEntityDn":"SubNetwork=CountryNN,MeContext=MEC-Gbg-1,ManagedElement=RNC-Gbg-1",
+               "measuredEntitySoftwareVersion":"",
+               "measInfoList":[
+                  {
+                     "measInfoId":{
+                        "sMeasInfoId":""
+                     },
+                     "measTypes":{
+                        "map":{
+                           "succImmediateAssignProcs":1
+                        },
+                        "sMeasTypesList":[
+                           "succImmediateAssignProcs"
+                        ]
+                     },
+                     "measValuesList":[
+                        {
+                           "measObjInstId":"RncFunction=RF-1,UtranCell=Gbg-997",
+                           "suspectFlag":"false",
+                           "measResults":[
+                              {
+                                 "p":1,
+                                 "sValue":"1113"
+                              }
+                           ]
+                        },
+                        {
+                           "measObjInstId":"RncFunction=RF-1,UtranCell=Gbg-998",
+                           "suspectFlag":"false",
+                           "measResults":[
+                              {
+                                 "p":1,
+                                 "sValue":"234"
+                              }
+                           ]
+                        },
+                        {
+                           "measObjInstId":"RncFunction=RF-1,UtranCell=Gbg-999",
+                           "suspectFlag":"true",
+                           "measResults":[
+                              {
+                                 "p":1,
+                                 "sValue":"789"
+                              }
+                           ]
+                        }
+                     ]
+                  }
+               ]
+            }
+         }
+      }
+   }
+
+If several jobs publish to the same Kafka topic (shared topic), the resulting filtered output will be an aggregate of all matching filters.
+So, each consumer will then get more data than requested.
+
+.. image:: ./sharedTopics.png
+   :width: 500pt
+
+==================
+Sent Kafka headers
+==================
+
+For each filtered result sent to a Kafka topic, there will the following proerties in the Kafa header:
+
+* type-id, this propery is used to indicate the ID of the information type. The value is a string.
+* gzip, if this property exists the object is gzipped (otherwise not). The property has no value.

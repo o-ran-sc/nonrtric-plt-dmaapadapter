@@ -23,6 +23,8 @@ package org.oran.dmaapadapter.tasks;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.repository.Job;
+import org.oran.dmaapadapter.repository.Jobs.JobGroup;
+import org.oran.dmaapadapter.repository.Jobs.JobGroupSingle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -36,14 +38,15 @@ import reactor.core.publisher.Mono;
 public class HttpJobDataDistributor extends JobDataDistributor {
     private static final Logger logger = LoggerFactory.getLogger(HttpJobDataDistributor.class);
 
-    public HttpJobDataDistributor(Job job, ApplicationConfig config) {
+    public HttpJobDataDistributor(JobGroup job, ApplicationConfig config) {
         super(job, config);
     }
 
     @Override
     protected Mono<String> sendToClient(Filter.FilteredData output) {
-        Job job = this.getJob();
-        logger.debug("Sending to consumer {} {} {}", job.getId(), job.getCallbackUrl(), output);
+        JobGroupSingle group = (JobGroupSingle) this.getJobGroup();
+        Job job = group.getJob();
+        logger.debug("Sending to consumer {} {} {}", job.getId(), job.getCallbackUrl(), output.getValueAString());
         MediaType contentType = job.isBuffered() || job.getType().isJson() ? MediaType.APPLICATION_JSON : null;
         return job.getConsumerRestClient().post("", output.getValueAString(), contentType);
     }

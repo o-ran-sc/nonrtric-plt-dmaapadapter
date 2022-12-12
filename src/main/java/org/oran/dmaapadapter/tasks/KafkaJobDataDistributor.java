@@ -29,7 +29,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
-import org.oran.dmaapadapter.repository.Job;
+import org.oran.dmaapadapter.repository.Jobs.JobGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,8 +48,8 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
 
     private KafkaSender<byte[], byte[]> sender;
 
-    public KafkaJobDataDistributor(Job job, ApplicationConfig appConfig) {
-        super(job, appConfig);
+    public KafkaJobDataDistributor(JobGroup jobGroup, ApplicationConfig appConfig) {
+        super(jobGroup, appConfig);
 
         SenderOptions<byte[], byte[]> senderOptions = senderOptions(appConfig);
         this.sender = KafkaSender.create(senderOptions);
@@ -57,16 +57,16 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
 
     @Override
     protected Mono<String> sendToClient(Filter.FilteredData data) {
-        Job job = this.getJob();
-        SenderRecord<byte[], byte[], Integer> senderRecord = senderRecord(data, job);
+
+        SenderRecord<byte[], byte[], Integer> senderRecord = senderRecord(data, this.getJobGroup().getTopic());
 
         logger.trace("Sending data '{}' to Kafka topic: {}", StringUtils.truncate(data.getValueAString(), 10),
-                job.getParameters().getKafkaOutputTopic());
+                this.getJobGroup().getTopic());
 
         return this.sender.send(Mono.just(senderRecord)) //
-                .doOnNext(n -> logger.debug("Sent data to Kafka topic: {}", job.getParameters().getKafkaOutputTopic())) //
-                .doOnError(
-                        t -> logger.warn("Failed to send to Kafka, job: {}, reason: {}", job.getId(), t.getMessage())) //
+                .doOnNext(n -> logger.debug("Sent data to Kafka topic: {}", this.getJobGroup().getTopic())) //
+                .doOnError(t -> logger.warn("Failed to send to Kafka, job: {}, reason: {}", this.getJobGroup().getId(),
+                        t.getMessage())) //
                 .onErrorResume(t -> Mono.empty()) //
                 .collectList() //
                 .map(x -> "ok");
@@ -93,9 +93,8 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
         return SenderOptions.create(props);
     }
 
-    private SenderRecord<byte[], byte[], Integer> senderRecord(Filter.FilteredData output, Job infoJob) {
+    private SenderRecord<byte[], byte[], Integer> senderRecord(Filter.FilteredData output, String topic) {
         int correlationMetadata = 2;
-        String topic = infoJob.getParameters().getKafkaOutputTopic();
         var producerRecord = new ProducerRecord<>(topic, null, null, output.key, output.value, output.headers());
         return SenderRecord.create(producerRecord, correlationMetadata);
     }

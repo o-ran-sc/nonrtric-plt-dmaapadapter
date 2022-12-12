@@ -34,7 +34,10 @@ public interface TopicListener {
     public static class DataFromTopic {
         public final byte[] key;
         public final byte[] value;
-        public final boolean isZipped;
+
+        public final String infoTypeId;
+
+        public final Iterable<Header> headers;
 
         private static byte[] noBytes = new byte[0];
 
@@ -43,28 +46,42 @@ public interface TopicListener {
         @ToString.Exclude
         private PmReport cachedPmReport;
 
-        public DataFromTopic(byte[] key, byte[] value, boolean isZipped) {
+        public DataFromTopic(String typeId, Iterable<Header> headers, byte[] key, byte[] value) {
             this.key = key == null ? noBytes : key;
             this.value = value == null ? noBytes : value;
-            this.isZipped = isZipped;
+            this.infoTypeId = typeId;
+            this.headers = headers;
         }
 
         public String valueAsString() {
             return new String(this.value);
         }
 
-        public static final String ZIP_PROPERTY = "gzip";
+        public static final String ZIPPED_PROPERTY = "gzip";
+        public static final String TYPE_ID_PROPERTY = "type-id";
 
-        public static boolean findZipped(Iterable<Header> headers) {
+        public boolean isZipped() {
             if (headers == null) {
                 return false;
             }
             for (Header h : headers) {
-                if (h.key().equals(ZIP_PROPERTY)) {
+                if (h.key().equals(ZIPPED_PROPERTY)) {
                     return true;
                 }
             }
             return false;
+        }
+
+        public String getTypeIdFromHeaders() {
+            if (headers == null) {
+                return "";
+            }
+            for (Header h : headers) {
+                if (h.key().equals(TYPE_ID_PROPERTY)) {
+                    return new String(h.value());
+                }
+            }
+            return "";
         }
     }
 
