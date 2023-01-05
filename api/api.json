@@ -80,6 +80,13 @@
                 }
             }
         },
+        "KafkaDeliveryInfo": {
+            "type": "object",
+            "properties": {
+                "topic": {"type": "string"},
+                "bootStrapServers": {"type": "string"}
+            }
+        },
         "void": {
             "description": "Void/empty",
             "type": "object"
@@ -101,7 +108,7 @@
                     "type": "integer"
                 },
                 "jobId": {"type": "string"},
-                "outputTopic": {"type": "string"},
+                "outputTopic": {"$ref": "#/components/schemas/KafkaDeliveryInfo"},
                 "noOfSentBytes": {
                     "format": "int64",
                     "type": "integer"
@@ -290,6 +297,15 @@
         "/actuator/health/**": {"get": {
             "summary": "Actuator web endpoint 'health-path'",
             "operationId": "health-path_2",
+            "responses": {"200": {
+                "description": "OK",
+                "content": {"*/*": {"schema": {"type": "object"}}}
+            }},
+            "tags": ["Actuator"]
+        }},
+        "/actuator/shutdown": {"post": {
+            "summary": "Actuator web endpoint 'shutdown'",
+            "operationId": "shutdown_2",
             "responses": {"200": {
                 "description": "OK",
                 "content": {"*/*": {"schema": {"type": "object"}}}

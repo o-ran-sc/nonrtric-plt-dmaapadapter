@@ -2,16 +2,11 @@
    "event": {
       "commonEventHeader": {
          "domain": "perf3gpp",
-         "eventId": "9efa1210-f285-455f-9c6a-3a659b1f1882",
-         "sequence": 0,
          "eventName": "perf3gpp_gnb-Ericsson_pmMeasResult",
          "sourceName": "O-DU-1122",
          "reportingEntityName": "",
-         "priority": "Normal",
          "startEpochMicrosec": 951912000000,
          "lastEpochMicrosec": 951912900000,
-         "version": "4.0",
-         "vesEventListenerVersion": "7.1",
          "timeZoneOffset": "+00:00"
       },
       "perf3gppFields": {

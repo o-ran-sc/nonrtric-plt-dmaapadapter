@@ -29,6 +29,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
+import org.oran.dmaapadapter.repository.Job.Parameters.KafkaDeliveryInfo;
 import org.oran.dmaapadapter.repository.Jobs.JobGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,20 +52,20 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
     public KafkaJobDataDistributor(JobGroup jobGroup, ApplicationConfig appConfig) {
         super(jobGroup, appConfig);
 
-        SenderOptions<byte[], byte[]> senderOptions = senderOptions(appConfig);
+        SenderOptions<byte[], byte[]> senderOptions = senderOptions(appConfig, jobGroup.getDeliveryInfo());
         this.sender = KafkaSender.create(senderOptions);
     }
 
     @Override
     protected Mono<String> sendToClient(Filter.FilteredData data) {
 
-        SenderRecord<byte[], byte[], Integer> senderRecord = senderRecord(data, this.getJobGroup().getTopic());
+        SenderRecord<byte[], byte[], Integer> senderRecord = senderRecord(data, this.getJobGroup().getDeliveryInfo());
 
         logger.trace("Sending data '{}' to Kafka topic: {}", StringUtils.truncate(data.getValueAString(), 10),
-                this.getJobGroup().getTopic());
+                this.getJobGroup().getDeliveryInfo());
 
         return this.sender.send(Mono.just(senderRecord)) //
-                .doOnNext(n -> logger.debug("Sent data to Kafka topic: {}", this.getJobGroup().getTopic())) //
+                .doOnNext(n -> logger.debug("Sent data to Kafka topic: {}", this.getJobGroup().getDeliveryInfo())) //
                 .doOnError(t -> logger.warn("Failed to send to Kafka, job: {}, reason: {}", this.getJobGroup().getId(),
                         t.getMessage())) //
                 .onErrorResume(t -> Mono.empty()) //
@@ -82,8 +83,13 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
         }
     }
 
-    private static SenderOptions<byte[], byte[]> senderOptions(ApplicationConfig config) {
-        String bootstrapServers = config.getKafkaBootStrapServers();
+    private static SenderOptions<byte[], byte[]> senderOptions(ApplicationConfig config,
+            KafkaDeliveryInfo deliveryInfo) {
+
+        String bootstrapServers = deliveryInfo.getBootStrapServers();
+        if (bootstrapServers == null || bootstrapServers.isEmpty()) {
+            bootstrapServers = config.getKafkaBootStrapServers();
+        }
 
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -93,9 +99,11 @@ public class KafkaJobDataDistributor extends JobDataDistributor {
         return SenderOptions.create(props);
     }
 
-    private SenderRecord<byte[], byte[], Integer> senderRecord(Filter.FilteredData output, String topic) {
+    private SenderRecord<byte[], byte[], Integer> senderRecord(Filter.FilteredData output,
+            KafkaDeliveryInfo deliveryInfo) {
         int correlationMetadata = 2;
-        var producerRecord = new ProducerRecord<>(topic, null, null, output.key, output.value, output.headers());
+        var producerRecord =
+                new ProducerRecord<>(deliveryInfo.getTopic(), null, null, output.key, output.value, output.headers());
         return SenderRecord.create(producerRecord, correlationMetadata);
     }
 

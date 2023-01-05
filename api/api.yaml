@@ -174,6 +174,19 @@ paths:
             '*/*':
               schema:
                 type: object
+  /actuator/shutdown:
+    post:
+      tags:
+      - Actuator
+      summary: Actuator web endpoint 'shutdown'
+      operationId: shutdown_2
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
   /data-producer/v1/info-producers/{infoProducerId}:
     get:
       tags:
@@ -515,6 +528,13 @@ components:
           type: string
           description: The target of Information subscription job status notifications
       description: Information for an Information Job
+    KafkaDeliveryInfo:
+      type: object
+      properties:
+        topic:
+          type: string
+        bootStrapServers:
+          type: string
     void:
       type: object
       description: Void/empty
@@ -534,7 +554,7 @@ components:
         jobId:
           type: string
         outputTopic:
-          type: string
+          $ref: '#/components/schemas/KafkaDeliveryInfo'
         noOfSentBytes:
           type: integer
           format: int64

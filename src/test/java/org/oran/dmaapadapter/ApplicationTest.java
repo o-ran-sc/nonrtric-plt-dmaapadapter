@@ -40,7 +40,9 @@ import java.util.Map;
 import org.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.clients.AsyncRestClientFactory;
 import org.oran.dmaapadapter.clients.SecurityContext;
@@ -75,11 +77,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+@TestMethodOrder(MethodOrderer.MethodName.class)
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = { //
         "server.ssl.key-store=./config/keystore.jks", //
@@ -115,7 +119,7 @@ class ApplicationTest {
     @Autowired
     private SecurityContext securityContext;
 
-    private com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+    private com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
 
     @LocalServerPort
     int localServerHttpPort;
@@ -383,7 +387,7 @@ class ApplicationTest {
         // Create a job with a PM filter
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
 
-        filterData.getMeasTypes().add("succImmediateAssignProcs");
+        filterData.addMeasTypes("UtranCell", "succImmediateAssignProcs");
         filterData.getMeasObjInstIds().add("UtranCell=Gbg-997");
         filterData.getSourceNames().add("O-DU-1122");
         filterData.getMeasuredEntityDns().add("ManagedElement=RNC-Gbg-1");
@@ -559,7 +563,7 @@ class ApplicationTest {
 
         // Create a job with a PM filter
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.getMeasTypes().add("succImmediateAssignProcs");
+        filterData.addMeasTypes("ManagedElement", "succImmediateAssignProcs");
         Job.Parameters param =
                 Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE).build();
 
@@ -601,7 +605,27 @@ class ApplicationTest {
         String stats = restClient().get(targetUri).block();
 
         assertThat(stats).contains(JOB_ID, "DmaapInformationType");
+    }
 
+    @Test
+    @SuppressWarnings("squid:S2925") // "Thread.sleep" should not be used in tests.
+    void testZZActuator() throws Exception {
+        // The test must be run last, hence the "ZZ" in the name. All succeeding tests
+        // will fail.
+        AsyncRestClient client = restClient();
+        client.post("/actuator/loggers/org.oran.dmaapadapter", "{\"configuredLevel\":\"trace\"}").block();
+        String resp = client.get("/actuator/loggers/org.oran.dmaapadapter").block();
+        assertThat(resp).contains("TRACE");
+        client.post("/actuator/loggers/org.springframework.boot.actuate", "{\"configuredLevel\":\"trace\"}").block();
+        // This will stop the web server and all coming tests will fail.
+        client.post("/actuator/shutdown", "").block();
+        Thread.sleep(1000);
+
+        String url = "https://localhost:" + applicationConfig.getLocalServerHttpPort() + "/v3/api-docs";
+        StepVerifier.create(restClient().get(url)) // Any call
+                .expectSubscription() //
+                .expectErrorMatches(t -> t instanceof WebClientRequestException) //
+                .verify();
     }
 
     public static void testErrorCode(Mono<?> request, HttpStatus expStatus, String responseContains) {

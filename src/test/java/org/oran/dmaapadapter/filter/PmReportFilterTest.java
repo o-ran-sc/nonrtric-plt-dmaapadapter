@@ -115,7 +115,7 @@ class PmReportFilterTest {
     void testPmFilterMeasTypes() throws Exception {
 
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.measTypes.add("succImmediateAssignProcs");
+        filterData.addMeasTypes("UtranCell", "succImmediateAssignProcs");
 
         PmReportFilter filter = new PmReportFilter(filterData);
         String filtered = filterReport(filter);
@@ -125,7 +125,8 @@ class PmReportFilterTest {
 
         // Test that no report is returned if not meas types were found
         filterData = new PmReportFilter.FilterData();
-        filterData.measTypes.add("junk");
+        filterData.addMeasTypes("junk", "succImmediateAssignProcs");
+
         filter = new PmReportFilter(filterData);
         filtered = filterReport(filter);
         assertThat(filtered).isEmpty();
@@ -150,7 +151,7 @@ class PmReportFilterTest {
     void testMeasObjClass() throws Exception {
         {
             PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-            filterData.measObjClass.add("junk");
+            filterData.addMeasTypes("junk");
             PmReportFilter filter = new PmReportFilter(filterData);
             String filtered = filterReport(filter);
             assertThat(filtered).isEmpty();
@@ -161,12 +162,12 @@ class PmReportFilterTest {
                     new TopicListener.DataFromTopic("typeId", null, null, loadReport().getBytes());
 
             PmReportFilter.FilterData utranCellFilter = new PmReportFilter.FilterData();
-            utranCellFilter.measObjClass.add("UtranCell");
+            utranCellFilter.addMeasTypes("UtranCell");
             FilteredData filtered = new PmReportFilter(utranCellFilter).filter(data);
             assertThat(filtered.getValueAString()).contains("UtranCell").doesNotContain("ENodeBFunction");
 
             PmReportFilter.FilterData eNodeBFilter = new PmReportFilter.FilterData();
-            eNodeBFilter.measObjClass.add("ENodeBFunction");
+            eNodeBFilter.addMeasTypes("ENodeBFunction");
             filtered = new PmReportFilter(eNodeBFilter).filter(data);
             assertThat(filtered.getValueAString()).contains("ENodeBFunction").doesNotContain("UtranCell");
         }
@@ -212,8 +213,7 @@ class PmReportFilterTest {
         {
 
             PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-            filterData.getMeasTypes().add("pmCounterNumber0");
-            filterData.getMeasObjClass().add("NRCellCU");
+            filterData.addMeasTypes("NRCellCU", "pmCounterNumber0");
             PmReportFilter filter = new PmReportFilter(filterData);
             DataFromTopic topicData = new DataFromTopic("typeId", null, null, pmReportJson.getBytes());
 

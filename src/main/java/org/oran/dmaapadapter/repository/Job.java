@@ -28,6 +28,7 @@ import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -36,6 +37,7 @@ import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.FilterFactory;
+import org.oran.dmaapadapter.repository.Job.Parameters.KafkaDeliveryInfo;
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +63,7 @@ public class Job {
         String inputTopic;
 
         @JsonProperty(value = "outputTopic", required = false)
-        String outputTopic;
+        KafkaDeliveryInfo outputTopic;
 
         @JsonProperty(value = "groupId", required = false)
         String groupId;
@@ -115,8 +117,18 @@ public class Job {
         @Getter
         private BufferTimeout bufferTimeout;
 
+        @Builder
+        @EqualsAndHashCode
+        public static class KafkaDeliveryInfo {
+            @Getter
+            private String topic;
+
+            @Getter
+            private String bootStrapServers;
+        }
+
         @Getter
-        private String kafkaOutputTopic;
+        private KafkaDeliveryInfo deliveryInfo;
 
         public Filter.Type getFilterType() {
             if (filter == null || filterType == null) {
@@ -197,7 +209,7 @@ public class Job {
                 .groupId(type.getKafkaGroupId()) //
                 .inputTopic(type.getKafkaInputTopic()) //
                 .jobId(id) //
-                .outputTopic(parameters.getKafkaOutputTopic()) //
+                .outputTopic(parameters.getDeliveryInfo()) //
                 .typeId(type.getId()) //
                 .clientId(type.getKafkaClientId(appConfig)) //
                 .build();

@@ -25,7 +25,6 @@ import java.util.Map;
 
 import lombok.Getter;
 
-import org.apache.logging.log4j.util.Strings;
 import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.repository.InfoType;
@@ -94,7 +93,7 @@ public class TopicListeners {
     }
 
     private JobDataDistributor createDistributor(JobGroup jobGroup) {
-        return !Strings.isEmpty(jobGroup.getTopic()) ? new KafkaJobDataDistributor(jobGroup, appConfig)
+        return jobGroup.getDeliveryInfo() != null ? new KafkaJobDataDistributor(jobGroup, appConfig)
                 : new HttpJobDataDistributor(jobGroup, appConfig);
     }
 

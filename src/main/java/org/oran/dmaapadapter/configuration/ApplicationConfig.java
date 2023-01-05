@@ -162,7 +162,7 @@ public class ApplicationConfig {
     }
 
     public Collection<InfoType> getTypes() {
-        com.google.gson.Gson gson = new com.google.gson.GsonBuilder().create();
+        com.google.gson.Gson gson = new com.google.gson.GsonBuilder().disableHtmlEscaping().create();
         try {
             String configJson = Files.readString(Path.of(getLocalConfigurationFilePath()), Charset.defaultCharset());
             ConfigFile configData = gson.fromJson(configJson, ConfigFile.class);

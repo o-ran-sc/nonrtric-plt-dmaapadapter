@@ -336,8 +336,14 @@ class IntegrationWithKafka {
 
     ConsumerJobInfo consumerJobInfoKafka(String topic, PmReportFilter.FilterData filterData) {
         try {
-            Job.Parameters param = Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE)
-                    .kafkaOutputTopic(topic).build();
+            Job.Parameters.KafkaDeliveryInfo deliveryInfo = Job.Parameters.KafkaDeliveryInfo.builder() //
+                    .topic(topic) //
+                    .bootStrapServers(this.applicationConfig.getKafkaBootStrapServers()) //
+                    .build();
+            Job.Parameters param = Job.Parameters.builder() //
+                    .filter(filterData) //
+                    .filterType(Job.Parameters.PM_FILTER_TYPE).deliveryInfo(deliveryInfo) //
+                    .build();
 
             String str = gson.toJson(param);
             Object parametersObj = jsonObject(str);
@@ -348,9 +354,13 @@ class IntegrationWithKafka {
         }
     }
 
-    ConsumerJobInfo consumerJobInfoKafka(String topic) {
+    private ConsumerJobInfo consumerJobInfoKafka(String topic) {
         try {
-            Job.Parameters param = Job.Parameters.builder().kafkaOutputTopic(topic).build();
+            Job.Parameters.KafkaDeliveryInfo deliveryInfo = Job.Parameters.KafkaDeliveryInfo.builder() //
+                    .topic(topic) //
+                    .bootStrapServers(this.applicationConfig.getKafkaBootStrapServers()) //
+                    .build();
+            Job.Parameters param = Job.Parameters.builder().deliveryInfo(deliveryInfo).build();
             String str = gson.toJson(param);
             Object parametersObj = jsonObject(str);
 
@@ -579,8 +589,8 @@ class IntegrationWithKafka {
         assertThat(icsSimulatorController.testResults.registrationInfo.supportedTypeIds).hasSize(this.types.size());
 
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-        filterData.getMeasTypes().add("pmCounterNumber0");
-        filterData.getMeasObjClass().add("NRCellCU");
+
+        filterData.addMeasTypes("NRCellCU", "pmCounterNumber0");
 
         this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
                 restClient());
@@ -630,9 +640,8 @@ class IntegrationWithKafka {
         PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
         final int NO_OF_COUNTERS = 2;
         for (int i = 0; i < NO_OF_COUNTERS; ++i) {
-            filterData.getMeasTypes().add("pmCounterNumber" + i);
+            filterData.addMeasTypes("NRCellCU", "pmCounterNumber" + i);
         }
-        filterData.getMeasObjClass().add("NRCellCU");
 
         final int NO_OF_JOBS = 150;
 
@@ -699,8 +708,7 @@ class IntegrationWithKafka {
             final String outputTopic = "kafkaCharacteristics_onePmJobs_manyReceivers";
             final String jobId = "manyJobs_" + i;
             PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
-            filterData.getMeasTypes().add("pmCounterNumber" + i); // all counters will be added
-            filterData.getMeasObjClass().add("NRCellCU");
+            filterData.addMeasTypes("NRCellCU", "pmCounterNumber" + i); // all counters will be added
 
             this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData), jobId, restClient());
 
