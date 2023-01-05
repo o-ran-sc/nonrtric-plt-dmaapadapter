@@ -116,7 +116,10 @@ typeSchema.json
 ===============
 This schema will by default be registerred for the type. The following properties are defined:
 
-* kafkaOutputTopic, optional parameter which enables the information job to output data to a Kafka topic instead of a direct call to a data consumer. The output of a job can be directed to HTTP or to Kafka regardless if the input is retrieved from DMaaP or from Kafka.
+* outputTopic, optional parameter which enables the information job to output data to a Kafka topic instead of a direct call to a data consumer. The output of a job can be directed to HTTP or to Kafka regardless if the input is retrieved from DMaaP or from Kafka. This consists of the following properties:
+
+  * topic, the name of the kafka topic
+  * bootStrapServers, reference to the kafka bus to used. This is optional, if this is omitted the default configured kafka bus is used (which is configured in the application.yaml file).
 
 * filterType, selects the type of filtering that will be done. This can be one of: "regexp", "json-path", "jslt".
 
@@ -186,9 +189,11 @@ The filterType parameter is extended to allow value "pmdata" which can be used f
 * sourceNames an array of source names for wanted PM reports.
 * measObjInstIds an array of meas object instances for wanted PM reports. If a given filter value is contained in the filter definition, it will match (partial matching).
   For instance a value like "NRCellCU" will match "ManagedElement=seliitdus00487,GNBCUCPFunction=1,NRCellCU=32".
-* measTypes selects the meas types to get
+* measTypeSpecs selects the meas types to get. This consist of:
+
+  * measObjClass matching of the class of the measObjInstId. The measObjInstId must follow the 3GPP naming conventions for Managed Objects (3GPP TS 32.106-8).
+  * measTypes the name of the measurement types (connected to the measObjClass).
 * measuredEntityDns partial match of meas entity DNs.
-* measObjClass matching of the class of the measObjInstId. The measObjInstId must follow the 3GPP naming conventions for Managed Objects (3GPP TS 32.106-8).
   Example, for a distinguished name "ManagedElement=RNC-Gbg-1,ENodeBFunction=1", the MO class will be "ENodeBFunction".
 * pmRopStartTime gives a possibility to query from already collected PM files. The start file is the time from when the information shall be returned.
   In this case, the query is only done for files from the given "sourceNames".
@@ -209,15 +214,17 @@ Below follows an example of a PM filter.
         "measObjInstIds":[
            "UtranCell=dGbg-997"
         ],
-        "measTypes":[
-           "succImmediateAssignProcs"
-        ],
+        "measTypeSpecs":[
+             {
+                "measuredObjClass":"UtranCell",
+                "measTypes":[
+                   "succImmediateAssignProcs"
+                ]
+             }
+          ],
         "measuredEntityDns":[
            "ManagedElement=RNC-Gbg-1"
         ],
-        "measObjClass":[
-           "UtranCell"
-        ]
         "pmRopStartTime" : "2022-12-13T10:50:44.000-08:00"
       }
     }
@@ -234,12 +241,15 @@ match two counters from all cells in two traffical nodes.
         "sourceNames":[
            "O-DU-1122", "O-DU-1123"
         ],
-        "measTypes":[
-           "succImmediateAssignProcs", "attTCHSeizures"
-        ],
-        "measObjClass":[
-           "UtranCell"
-        ]
+        "measTypeSpecs":[
+             {
+                "measuredObjClass":"NRCellCU",
+                "measTypes":[
+                   "pmCounterNumber0", "pmCounterNumber1"
+                ]
+             }
+          ],
+
       }
     }
 

@@ -118,6 +118,22 @@ public class AsyncRestClient {
                 .map(this::toBody);
     }
 
+    public Mono<ResponseEntity<String>> postForEntity(String uri, @Nullable String body) {
+        Mono<String> bodyProducer = body != null ? Mono.just(body) : Mono.empty();
+
+        RequestHeadersSpec<?> request = getWebClient() //
+                .post() //
+                .uri(uri) //
+                .contentType(MediaType.APPLICATION_JSON) //
+                .body(bodyProducer, String.class);
+        return retrieve(request);
+    }
+
+    public Mono<String> post(String uri, @Nullable String body) {
+        return postForEntity(uri, body) //
+                .map(this::toBody);
+    }
+
     private Mono<ResponseEntity<String>> retrieve(RequestHeadersSpec<?> request) {
         if (securityContext.isConfigured()) {
             request.headers(h -> h.setBearerAuth(securityContext.getBearerAuthToken()));

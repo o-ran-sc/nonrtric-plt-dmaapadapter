@@ -17,8 +17,19 @@
       "type": "integer",
       "minimum": 1
     },
-    "kafkaOutputTopic" : {
-      "type": "string"
+    "deliveryInfo": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string"
+        },
+        "bootStrapServers": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "topic"
+      ]
     },
     "bufferTimeout": {
       "type": "object",

@@ -40,6 +40,7 @@ import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.FilterFactory;
 import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.repository.Job.Parameters;
+import org.oran.dmaapadapter.repository.Job.Parameters.KafkaDeliveryInfo;
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +69,7 @@ public class Jobs {
 
         public Iterable<Job> getJobs();
 
-        public String getTopic();
+        public KafkaDeliveryInfo getDeliveryInfo();
     }
 
     public static class JobGroupSingle implements JobGroup {
@@ -113,14 +114,14 @@ public class Jobs {
         }
 
         @Override
-        public String getTopic() {
-            return this.job.getParameters().getKafkaOutputTopic();
+        public KafkaDeliveryInfo getDeliveryInfo() {
+            return this.job.getParameters().getDeliveryInfo();
         }
     }
 
     public static class JobGroupPm implements JobGroup {
         @Getter
-        private final String topic;
+        private final KafkaDeliveryInfo deliveryInfo;
 
         private Map<String, Job> jobs = new HashMap<>();
 
@@ -130,8 +131,8 @@ public class Jobs {
         @Getter
         private final InfoType type;
 
-        public JobGroupPm(InfoType type, String topic) {
-            this.topic = topic;
+        public JobGroupPm(InfoType type, KafkaDeliveryInfo topic) {
+            this.deliveryInfo = topic;
             this.type = type;
         }
 
@@ -171,7 +172,7 @@ public class Jobs {
 
         @Override
         public String getId() {
-            return topic;
+            return deliveryInfo.getTopic();
         }
 
         @Override
@@ -184,7 +185,7 @@ public class Jobs {
 
     private Map<String, Job> allJobs = new HashMap<>();
     private MultiMap<Job> jobsByType = new MultiMap<>();
-    private Map<String, JobGroup> jobGroups = new HashMap<>();
+    private Map<String, JobGroup> jobGroups = new HashMap<>(); // Key is Topic or JobId
     private final AsyncRestClientFactory restclientFactory;
     private final List<Observer> observers = new ArrayList<>();
     private final ApplicationConfig appConfig;
@@ -210,7 +211,7 @@ public class Jobs {
     public void addJob(String id, String callbackUrl, InfoType type, String owner, String lastUpdated,
             Parameters parameters) throws ServiceException {
 
-        if (!Strings.isNullOrEmpty(parameters.getKafkaOutputTopic()) && !Strings.isNullOrEmpty(callbackUrl)) {
+        if ((parameters.getDeliveryInfo() != null) && !Strings.isNullOrEmpty(callbackUrl)) {
             throw new ServiceException("Cannot deliver to both Kafka and HTTP in the same job", HttpStatus.BAD_REQUEST);
         }
         AsyncRestClient consumerRestClient = type.isUseHttpProxy() //
@@ -227,10 +228,10 @@ public class Jobs {
     }
 
     private String jobGroupId(Job job) {
-        if (Strings.isNullOrEmpty(job.getParameters().getKafkaOutputTopic())) {
+        if (job.getParameters().getDeliveryInfo() == null) {
             return job.getId();
         } else if (job.getParameters().getFilterType() == Filter.Type.PM_DATA) {
-            return job.getParameters().getKafkaOutputTopic();
+            return job.getParameters().getDeliveryInfo().getTopic();
         } else {
             return job.getId();
         }
@@ -244,20 +245,20 @@ public class Jobs {
         jobsByType.put(job.getType().getId(), job.getId(), job);
 
         if (job.getParameters().getFilterType() == Filter.Type.PM_DATA
-                && job.getParameters().getKafkaOutputTopic() != null) {
-            String topic = job.getParameters().getKafkaOutputTopic();
-            if (!this.jobGroups.containsKey(topic)) {
-                final JobGroupPm group = new JobGroupPm(job.getType(), topic);
-                this.jobGroups.put(topic, group);
+                && job.getParameters().getDeliveryInfo() != null) {
+            String jobGroupId = jobGroupId(job);
+            if (!this.jobGroups.containsKey(jobGroupId)) {
+                final JobGroupPm group = new JobGroupPm(job.getType(), job.getParameters().getDeliveryInfo());
+                this.jobGroups.put(jobGroupId, group);
                 group.add(job);
                 this.observers.forEach(obs -> obs.onJobbGroupAdded(group));
             } else {
-                JobGroupPm group = (JobGroupPm) this.jobGroups.get(topic);
+                JobGroupPm group = (JobGroupPm) this.jobGroups.get(jobGroupId);
                 group.add(job);
             }
         } else {
             JobGroupSingle group = new JobGroupSingle(job);
-            this.jobGroups.put(job.getId(), group);
+            this.jobGroups.put(jobGroupId(job), group);
             this.observers.forEach(obs -> obs.onJobbGroupAdded(group));
         }
     }
@@ -275,7 +276,7 @@ public class Jobs {
     }
 
     public void remove(Job job) {
-        String groupId = this.jobGroupId(job);
+        String groupId = jobGroupId(job);
         JobGroup group = this.jobGroups.get(groupId);
         synchronized (this) {
             this.allJobs.remove(job.getId());
