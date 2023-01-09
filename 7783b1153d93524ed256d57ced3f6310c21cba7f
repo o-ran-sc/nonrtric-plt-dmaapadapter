@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2fbf0385_6a087daf",
+        "filename": "src/main/java/org/oran/dmaapadapter/repository/Job.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 66,
+      "author": {
+        "id": 1000201
+      },
+      "writtenOn": "2023-01-09T15:16:09Z",
+      "side": 1,
+      "message": "After a quick look at the changes made, it looks to me as if this member might be reduntant after this change, is that so?",
+      "range": {
+        "startLine": 66,
+        "startChar": 26,
+        "endLine": 66,
+        "endChar": 37
+      },
+      "revId": "7783b1153d93524ed256d57ced3f6310c21cba7f",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    }
+  ]
+}
