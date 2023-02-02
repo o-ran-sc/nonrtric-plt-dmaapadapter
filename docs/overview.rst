@@ -131,7 +131,7 @@ This schema will by default be registerred for the type. The following propertie
 * bufferTimeout can be used to buffer several json objects received from Kafka when kafkaInputTopic is defined into one json array. If bufferTimeout is used, the delivered data will be a Json array of the objects received. If not, each received object will be delivered in a separate call. This contains:
 
   * maxSize, the maximum number of objects to collect before delivery to the consumer
-  * maxTimeMiliseconds, the maximum time to delay delivery (to buffer).
+  * maxTimeMilliseconds, the maximum time to delay delivery (to buffer).
 
 * maxConcurrency, defines max how many paralell REST calls the consumer wishes to receive. 1, which is default, means sequential. A higher value may increase throughput.
 
@@ -168,7 +168,7 @@ Below follows an example of using bufferTimeout and maxConcurrency.
     {
        "bufferTimeout":{
           "maxSize":123,
-          "maxTimeMiliseconds":456
+          "maxTimeMilliseconds":456
        },
        "maxConcurrency":1
     }

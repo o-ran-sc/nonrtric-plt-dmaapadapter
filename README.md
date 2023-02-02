@@ -55,14 +55,14 @@ When an Information Job is created in the Information Coordinator Service Consum
         "maxSize": {
           "type": "integer"
         },
-        "maxTimeMiliseconds": {
+        "maxTimeMilliseconds": {
           "type": "integer"
         }
       },
       "additionalProperties": false,
       "required": [
         "maxSize",
-        "maxTimeMiliseconds"
+        "maxTimeMilliseconds"
       ]
     }
   },
@@ -79,7 +79,7 @@ When an Information Job is created in the Information Coordinator Service Consum
    Object1 and Object2 may be posted in one call -->  ["Object1", "Object2"]
  The bufferTimeout is a Json object and the parameters in the object are:
    - maxSize the maximum number of buffered objects before posting
-   - maxTimeMiliseconds the maximum delay time to buffer before posting
+   - maxTimeMilliseconds the maximum delay time to buffer before posting
  If no bufferTimeout is specified, each object will be posted as received in separate calls (not quoted and put in a Json array).
 
 

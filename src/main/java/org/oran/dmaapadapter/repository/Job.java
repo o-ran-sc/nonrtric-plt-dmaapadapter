@@ -147,9 +147,9 @@ public class Job {
     }
 
     public static class BufferTimeout {
-        public BufferTimeout(int maxSize, long maxTimeMiliseconds) {
+        public BufferTimeout(int maxSize, long maxTimeMilliseconds) {
             this.maxSize = maxSize;
-            this.maxTimeMiliseconds = maxTimeMiliseconds;
+            this.maxTimeMilliseconds = maxTimeMilliseconds;
         }
 
         public BufferTimeout() {}
@@ -157,10 +157,10 @@ public class Job {
         @Getter
         private int maxSize;
 
-        private long maxTimeMiliseconds;
+        private long maxTimeMilliseconds;
 
         public Duration getMaxTime() {
-            return Duration.ofMillis(maxTimeMiliseconds);
+            return Duration.ofMillis(maxTimeMilliseconds);
         }
     }
 
@@ -224,7 +224,7 @@ public class Job {
 
     public boolean isBuffered() {
         return parameters != null && parameters.bufferTimeout != null && parameters.bufferTimeout.maxSize > 0
-                && parameters.bufferTimeout.maxTimeMiliseconds > 0;
+                && parameters.bufferTimeout.maxTimeMilliseconds > 0;
     }
 
 }

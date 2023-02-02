@@ -307,8 +307,8 @@ class IntegrationWithKafka {
         return "https://localhost:" + this.applicationConfig.getLocalServerHttpPort();
     }
 
-    private static Object jobParametersAsJsonObject(String filter, long maxTimeMiliseconds, int maxSize) {
-        Job.BufferTimeout buffer = maxSize > 0 ? new Job.BufferTimeout(maxSize, maxTimeMiliseconds) : null;
+    private static Object jobParametersAsJsonObject(String filter, long maxTimeMilliseconds, int maxSize) {
+        Job.BufferTimeout buffer = maxSize > 0 ? new Job.BufferTimeout(maxSize, maxTimeMilliseconds) : null;
         Job.Parameters param = Job.Parameters.builder().filter(filter).filterType(Job.Parameters.REGEXP_TYPE)
                 .bufferTimeout(buffer).build();
 
