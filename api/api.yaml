@@ -10,10 +10,6 @@ info:
 servers:
 - url: /
 tags:
-- name: Information Coordinator Service Simulator (exists only in test)
-- name: Producer job control API
-- name: Test Consumer Simulator (exists only in test)
-- name: DMAAP Simulator (exists only in test)
 - name: Actuator
   description: Monitor and interact
   externalDocs:
@@ -25,12 +21,21 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'threaddump'
-      operationId: threaddump_4
+      operationId: threaddump
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            text/plain;charset=UTF-8:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
               schema:
                 type: object
   /actuator/info:
@@ -38,12 +43,18 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'info'
-      operationId: info_2
+      operationId: info
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
               schema:
                 type: object
   /data-producer/v1/info-types/{infoTypeId}:
@@ -153,12 +164,18 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'loggers'
-      operationId: loggers_2
+      operationId: loggers
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
               schema:
                 type: object
   /actuator/health/**:
@@ -166,12 +183,18 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'health-path'
-      operationId: health-path_2
+      operationId: health-path
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
               schema:
                 type: object
   /actuator/shutdown:
@@ -179,12 +202,18 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'shutdown'
-      operationId: shutdown_2
+      operationId: shutdown
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
               schema:
                 type: object
   /data-producer/v1/info-producers/{infoProducerId}:
@@ -232,6 +261,33 @@ paths:
             application/json:
               schema:
                 type: object
+  /actuator/metrics/{requiredMetricName}:
+    get:
+      tags:
+      - Actuator
+      summary: Actuator web endpoint 'metrics-requiredMetricName'
+      operationId: metrics-requiredMetricName
+      parameters:
+      - name: requiredMetricName
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
+              schema:
+                type: object
   /generic_dataproducer/info_job/{infoJobId}:
     delete:
       tags:
@@ -255,38 +311,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/void'
-  /actuator/metrics/{requiredMetricName}:
-    get:
-      tags:
-      - Actuator
-      summary: Actuator web endpoint 'metrics-requiredMetricName'
-      operationId: metrics-requiredMetricName_2
-      parameters:
-      - name: requiredMetricName
-        in: path
-        required: true
-        style: simple
-        explode: false
-        schema:
-          type: string
-      responses:
-        200:
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: object
   /actuator:
     get:
       tags:
       - Actuator
       summary: Actuator root web endpoint
-      operationId: links_1
+      operationId: links
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  additionalProperties:
+                    $ref: '#/components/schemas/Link'
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  additionalProperties:
+                    $ref: '#/components/schemas/Link'
+            application/vnd.spring-boot.actuator.v2+json:
               schema:
                 type: object
                 additionalProperties:
@@ -298,12 +347,12 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'logfile'
-      operationId: logfile_2
+      operationId: logfile
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            text/plain;charset=UTF-8:
               schema:
                 type: object
   /data-consumer/v1/info-jobs/{infoJobId}:
@@ -337,7 +386,7 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'loggers-name'
-      operationId: loggers-name_4
+      operationId: loggers-name
       parameters:
       - name: name
         in: path
@@ -350,14 +399,20 @@ paths:
         200:
           description: OK
           content:
-            '*/*':
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
               schema:
                 type: object
     post:
       tags:
       - Actuator
       summary: Actuator web endpoint 'loggers-name'
-      operationId: loggers-name_3
+      operationId: loggers-name_2
       parameters:
       - name: name
         in: path
@@ -366,6 +421,19 @@ paths:
         explode: false
         schema:
           type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              enum:
+              - TRACE
+              - DEBUG
+              - INFO
+              - WARN
+              - ERROR
+              - FATAL
+              - OFF
       responses:
         200:
           description: OK
@@ -378,12 +446,18 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'health'
-      operationId: health_2
+      operationId: health
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
               schema:
                 type: object
   /dmaap-topic-2:
@@ -441,12 +515,18 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'metrics'
-      operationId: metrics_2
+      operationId: metrics
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
               schema:
                 type: object
   /actuator/heapdump:
@@ -454,12 +534,12 @@ paths:
       tags:
       - Actuator
       summary: Actuator web endpoint 'heapdump'
-      operationId: heapdump_2
+      operationId: heapdump
       responses:
         200:
           description: OK
           content:
-            '*/*':
+            application/octet-stream:
               schema:
                 type: object
 components:

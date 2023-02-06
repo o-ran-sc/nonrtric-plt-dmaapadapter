@@ -72,8 +72,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
-import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.boot.web.servlet.server.ServletWebServerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.TestPropertySource;
@@ -97,7 +97,7 @@ import reactor.kafka.sender.SenderRecord;
 class IntegrationWithKafka {
 
     final String KAFKA_TYPE_ID = "KafkaInformationType";
-    final String PM_TYPE_ID = "PmDataOverKafka";
+    final static String PM_TYPE_ID = "PmDataOverKafka";
 
     @Autowired
     private ApplicationConfig applicationConfig;
@@ -334,11 +334,12 @@ class IntegrationWithKafka {
         }
     }
 
-    ConsumerJobInfo consumerJobInfoKafka(String topic, PmReportFilter.FilterData filterData) {
+    public static ConsumerJobInfo consumerJobInfoKafka(String kafkaBootstrapServers, String topic,
+            PmReportFilter.FilterData filterData) {
         try {
             Job.Parameters.KafkaDeliveryInfo deliveryInfo = Job.Parameters.KafkaDeliveryInfo.builder() //
                     .topic(topic) //
-                    .bootStrapServers(this.applicationConfig.getKafkaBootStrapServers()) //
+                    .bootStrapServers(kafkaBootstrapServers) //
                     .build();
             Job.Parameters param = Job.Parameters.builder() //
                     .filter(filterData) //
@@ -592,10 +593,10 @@ class IntegrationWithKafka {
 
         filterData.addMeasTypes("NRCellCU", "pmCounterNumber0");
 
-        this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
-                restClient());
-        this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver2.OUTPUT_TOPIC, filterData), JOB_ID2,
-                restClient());
+        this.icsSimulatorController.addJob(consumerJobInfoKafka(this.applicationConfig.getKafkaBootStrapServers(),
+                kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID, restClient());
+        this.icsSimulatorController.addJob(consumerJobInfoKafka(this.applicationConfig.getKafkaBootStrapServers(),
+                kafkaReceiver2.OUTPUT_TOPIC, filterData), JOB_ID2, restClient());
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(2));
         waitForKafkaListener();
@@ -648,8 +649,9 @@ class IntegrationWithKafka {
         ArrayList<KafkaReceiver> receivers = new ArrayList<>();
         for (int i = 0; i < NO_OF_JOBS; ++i) {
             final String outputTopic = "manyJobs_" + i;
-            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData), outputTopic,
-                    restClient());
+            this.icsSimulatorController.addJob(
+                    consumerJobInfoKafka(this.applicationConfig.getKafkaBootStrapServers(), outputTopic, filterData),
+                    outputTopic, restClient());
             KafkaReceiver receiver = new KafkaReceiver(this.applicationConfig, outputTopic, this.securityContext, null);
             receivers.add(receiver);
         }
@@ -710,7 +712,9 @@ class IntegrationWithKafka {
             PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
             filterData.addMeasTypes("NRCellCU", "pmCounterNumber" + i); // all counters will be added
 
-            this.icsSimulatorController.addJob(consumerJobInfoKafka(outputTopic, filterData), jobId, restClient());
+            this.icsSimulatorController.addJob(
+                    consumerJobInfoKafka(this.applicationConfig.getKafkaBootStrapServers(), outputTopic, filterData),
+                    jobId, restClient());
 
             KafkaReceiver receiver =
                     new KafkaReceiver(this.applicationConfig, outputTopic, this.securityContext, "group_" + i);
@@ -793,8 +797,8 @@ class IntegrationWithKafka {
 
         filterData.setPmRopEndTime(OffsetDateTime.now().toString());
 
-        this.icsSimulatorController.addJob(consumerJobInfoKafka(kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID,
-                restClient());
+        this.icsSimulatorController.addJob(consumerJobInfoKafka(this.applicationConfig.getKafkaBootStrapServers(),
+                kafkaReceiver.OUTPUT_TOPIC, filterData), JOB_ID, restClient());
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
         await().untilAsserted(() -> assertThat(kafkaReceiver.count).isPositive());

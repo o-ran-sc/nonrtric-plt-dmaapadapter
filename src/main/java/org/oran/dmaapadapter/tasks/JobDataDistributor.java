@@ -119,8 +119,16 @@ public abstract class JobDataDistributor {
                     .map(this::gzip) //
                     .flatMap(this::sendToClient, 1) //
                     .onErrorResume(this::handleCollectHistoricalDataError) //
+                    .doFinally(sig -> sendLastStoredRecord()) //
                     .subscribe();
         }
+    }
+
+    private void sendLastStoredRecord() {
+        String data = "{}";
+        Filter.FilteredData output = new Filter.FilteredData(this.jobGroup.getType().getId(), null, data.getBytes());
+
+        sendToClient(output).subscribe();
     }
 
     private static PmReportFilter getPmReportFilter(JobGroup jobGroup) {

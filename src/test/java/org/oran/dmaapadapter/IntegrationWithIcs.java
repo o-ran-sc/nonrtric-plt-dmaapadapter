@@ -294,16 +294,18 @@ class IntegrationWithIcs {
     @Test
     void testPmFilter() throws Exception {
         await().untilAsserted(() -> assertThat(producerRegstrationTask.isRegisteredInIcs()).isTrue());
-        final String TYPE_ID = "PmDataOverRest";
+        final String TYPE_ID = "KafkaInformationType";
 
-        String jsonStr = pmJobParameters();
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
 
-        ConsumerJobInfo jobInfo = new ConsumerJobInfo(TYPE_ID, jsonObject(jsonStr), "owner", consumerUri(), "");
+        ConsumerJobInfo jobInfo = IntegrationWithKafka
+                .consumerJobInfoKafka(this.applicationConfig.getKafkaBootStrapServers(), TYPE_ID, filterData);
 
         createInformationJobInIcs(DMAAP_JOB_ID, jobInfo);
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
         deleteInformationJobInIcs(DMAAP_JOB_ID);
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
+
     }
 }

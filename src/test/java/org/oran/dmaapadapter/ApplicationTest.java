@@ -69,8 +69,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
-import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.boot.web.servlet.server.ServletWebServerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
@@ -395,6 +395,7 @@ class ApplicationTest {
                 Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE).build();
 
         String paramJson = gson.toJson(param);
+        System.out.println(paramJson);
         ConsumerJobInfo jobInfo = consumerJobInfo("PmDataOverRest", "EI_PM_JOB_ID", toJson(paramJson));
 
         this.icsSimulatorController.addJob(jobInfo, JOB_ID, restClient());
@@ -450,7 +451,9 @@ class ApplicationTest {
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
 
         ConsumerController.TestResults consumer = this.consumerController.testResults;
-        await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(1));
+        await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(2));
+
+        assertThat(consumer.receivedBodies.get(1)).isEqualTo("{}"); // End marker
     }
 
     @Test
