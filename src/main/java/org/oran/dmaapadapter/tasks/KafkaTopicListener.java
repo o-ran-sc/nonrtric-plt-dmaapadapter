@@ -85,7 +85,7 @@ public class KafkaTopicListener implements TopicListener {
                 .doFinally(
                         sig -> logger.error("KafkaTopicListener stopped, type: {}, reason: {}", this.type.getId(), sig)) //
                 .filter(t -> t.value().length > 0 || t.key().length > 0) //
-                .map(input -> new DataFromTopic(input.key(), input.value(), DataFromTopic.findZipped(input.headers()))) //
+                .map(input -> new DataFromTopic(this.type.getId(), input.headers(), input.key(), input.value())) //
                 .flatMap(data -> getDataFromFileIfNewPmFileEvent(data, type, dataStore)) //
                 .publish() //
                 .autoConnect(1);
@@ -126,7 +126,7 @@ public class KafkaTopicListener implements TopicListener {
             logger.trace("Reading PM measurements, type: {}, inputTopic: {}", type.getId(), type.getKafkaInputTopic());
             return fileStore.readObject(DataStore.Bucket.FILES, ev.getFilename()) //
                     .map(bytes -> unzip(bytes, ev.getFilename())) //
-                    .map(bytes -> new DataFromTopic(data.key, bytes, false));
+                    .map(bytes -> new DataFromTopic(data.infoTypeId, data.headers, data.key, bytes));
 
         } catch (Exception e) {
             return Mono.just(data);

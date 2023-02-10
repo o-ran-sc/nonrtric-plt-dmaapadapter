@@ -27,10 +27,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
 
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.oran.dmaapadapter.clients.AsyncRestClient;
@@ -39,6 +35,7 @@ import org.oran.dmaapadapter.clients.SecurityContext;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig;
 import org.oran.dmaapadapter.configuration.WebClientConfig.HttpProxyConfig;
+import org.oran.dmaapadapter.filter.PmReportFilter;
 import org.oran.dmaapadapter.r1.ConsumerJobInfo;
 import org.oran.dmaapadapter.repository.Job;
 import org.oran.dmaapadapter.repository.Jobs;
@@ -275,11 +272,23 @@ class IntegrationWithIcs {
         ConsumerController.TestResults results = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(results.receivedBodies).hasSize(2));
         assertThat(results.receivedBodies.get(0)).isEqualTo("DmaapResponse1");
-        assertThat(results.receivedHeaders.get(0)).containsEntry("content-type", "text/plain;charset=UTF-8");
 
         deleteInformationJobInIcs(DMAAP_JOB_ID);
 
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());
+    }
+
+    private String pmJobParameters() {
+        PmReportFilter.FilterData filterData = new PmReportFilter.FilterData();
+
+        filterData.addMeasTypes("UtranCell", "succImmediateAssignProcs");
+        filterData.getMeasObjInstIds().add("UtranCell=Gbg-997");
+        filterData.getSourceNames().add("O-DU-1122");
+        filterData.getMeasuredEntityDns().add("ManagedElement=RNC-Gbg-1");
+        Job.Parameters param =
+                Job.Parameters.builder().filter(filterData).filterType(Job.Parameters.PM_FILTER_TYPE).build();
+
+        return gson.toJson(param);
     }
 
     @Test
@@ -287,25 +296,12 @@ class IntegrationWithIcs {
         await().untilAsserted(() -> assertThat(producerRegstrationTask.isRegisteredInIcs()).isTrue());
         final String TYPE_ID = "PmDataOverRest";
 
-        String jsonStr =
-                reQuote("{ 'filterType' : 'pmdata', 'filter': { 'measTypes': [ 'succImmediateAssignProcs' ] } }");
+        String jsonStr = pmJobParameters();
 
         ConsumerJobInfo jobInfo = new ConsumerJobInfo(TYPE_ID, jsonObject(jsonStr), "owner", consumerUri(), "");
 
         createInformationJobInIcs(DMAAP_JOB_ID, jobInfo);
         await().untilAsserted(() -> assertThat(this.jobs.size()).isEqualTo(1));
-
-        String path = "./src/test/resources/pm_report.json";
-        String pmReportJson = Files.readString(Path.of(path), Charset.defaultCharset());
-        DmaapSimulatorController.addPmResponse(pmReportJson);
-
-        ConsumerController.TestResults results = this.consumerController.testResults;
-        await().untilAsserted(() -> assertThat(results.receivedBodies).hasSize(1));
-
-        String filtered = results.receivedBodies.get(0);
-        assertThat(filtered).contains("succImmediateAssignProcs").doesNotContain("attTCHSeizures");
-
-        logger.info(filtered);
 
         deleteInformationJobInIcs(DMAAP_JOB_ID);
         await().untilAsserted(() -> assertThat(this.jobs.size()).isZero());

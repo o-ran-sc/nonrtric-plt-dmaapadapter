@@ -296,6 +296,15 @@
             }},
             "tags": ["Actuator"]
         }},
+        "/actuator/shutdown": {"post": {
+            "summary": "Actuator web endpoint 'shutdown'",
+            "operationId": "shutdown_2",
+            "responses": {"200": {
+                "description": "OK",
+                "content": {"*/*": {"schema": {"type": "object"}}}
+            }},
+            "tags": ["Actuator"]
+        }},
         "/data-producer/v1/info-producers/{infoProducerId}": {
             "get": {
                 "operationId": "getInfoProducer",

@@ -17,8 +17,19 @@
       "type": "integer",
       "minimum": 1
     },
-    "kafkaOutputTopic" : {
-      "type": "string"
+    "deliveryInfo": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string"
+        },
+        "bootStrapServers": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "topic"
+      ]
     },
     "bufferTimeout": {
       "type": "object",
@@ -27,7 +38,7 @@
           "type": "integer",
           "minimum": 1
         },
-        "maxTimeMiliseconds": {
+        "maxTimeMilliseconds": {
           "type": "integer",
           "minimum": 0,
           "maximum": 160000
@@ -36,7 +47,7 @@
       "additionalProperties": false,
       "required": [
         "maxSize",
-        "maxTimeMiliseconds"
+        "maxTimeMilliseconds"
       ]
     }
   },

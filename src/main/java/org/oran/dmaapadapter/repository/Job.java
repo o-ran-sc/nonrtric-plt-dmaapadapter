@@ -28,6 +28,7 @@ import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -36,6 +37,7 @@ import org.oran.dmaapadapter.clients.AsyncRestClient;
 import org.oran.dmaapadapter.configuration.ApplicationConfig;
 import org.oran.dmaapadapter.filter.Filter;
 import org.oran.dmaapadapter.filter.FilterFactory;
+import org.oran.dmaapadapter.repository.Job.Parameters.KafkaDeliveryInfo;
 import org.oran.dmaapadapter.tasks.TopicListener.DataFromTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +51,6 @@ public class Job {
     @Schema(name = "job_statistics", description = "Statistics information for one job")
     public static class Statistics {
 
-        // @Schema(name = "jobId", description = "jobId", required = true)
-        // @SerializedName("jobId")
         @JsonProperty(value = "jobId", required = true)
         String jobId;
 
@@ -115,8 +115,18 @@ public class Job {
         @Getter
         private BufferTimeout bufferTimeout;
 
+        @Builder
+        @EqualsAndHashCode
+        public static class KafkaDeliveryInfo {
+            @Getter
+            private String topic;
+
+            @Getter
+            private String bootStrapServers;
+        }
+
         @Getter
-        private String kafkaOutputTopic;
+        private KafkaDeliveryInfo deliveryInfo;
 
         public Filter.Type getFilterType() {
             if (filter == null || filterType == null) {
@@ -137,9 +147,9 @@ public class Job {
     }
 
     public static class BufferTimeout {
-        public BufferTimeout(int maxSize, long maxTimeMiliseconds) {
+        public BufferTimeout(int maxSize, long maxTimeMilliseconds) {
             this.maxSize = maxSize;
-            this.maxTimeMiliseconds = maxTimeMiliseconds;
+            this.maxTimeMilliseconds = maxTimeMilliseconds;
         }
 
         public BufferTimeout() {}
@@ -147,10 +157,10 @@ public class Job {
         @Getter
         private int maxSize;
 
-        private long maxTimeMiliseconds;
+        private long maxTimeMilliseconds;
 
         public Duration getMaxTime() {
-            return Duration.ofMillis(maxTimeMiliseconds);
+            return Duration.ofMillis(maxTimeMilliseconds);
         }
     }
 
@@ -197,7 +207,7 @@ public class Job {
                 .groupId(type.getKafkaGroupId()) //
                 .inputTopic(type.getKafkaInputTopic()) //
                 .jobId(id) //
-                .outputTopic(parameters.getKafkaOutputTopic()) //
+                .outputTopic(parameters.getDeliveryInfo() == null ? "" : parameters.getDeliveryInfo().topic) //
                 .typeId(type.getId()) //
                 .clientId(type.getKafkaClientId(appConfig)) //
                 .build();
@@ -207,14 +217,14 @@ public class Job {
     public Filter.FilteredData filter(DataFromTopic data) {
         if (filter == null) {
             logger.debug("No filter used");
-            return new Filter.FilteredData(data.key, data.value);
+            return new Filter.FilteredData(data.infoTypeId, data.key, data.value);
         }
         return filter.filter(data);
     }
 
     public boolean isBuffered() {
         return parameters != null && parameters.bufferTimeout != null && parameters.bufferTimeout.maxSize > 0
-                && parameters.bufferTimeout.maxTimeMiliseconds > 0;
+                && parameters.bufferTimeout.maxTimeMilliseconds > 0;
     }
 
 }

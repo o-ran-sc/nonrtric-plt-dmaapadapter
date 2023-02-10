@@ -48,6 +48,14 @@ public class Application {
 
     public static void main(String[] args) {
         applicationContext = SpringApplication.run(Application.class);
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                logger.warn("Shutting down, received signal SIGTERM");
+                SpringApplication.exit(applicationContext);
+                applicationContext = null;
+            }
+        });
     }
 
     @Scheduled(fixedRate = 10 * 1000)
