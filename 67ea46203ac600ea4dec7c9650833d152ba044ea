@@ -16,6 +16,23 @@
       "message": "remerge",
       "revId": "67ea46203ac600ea4dec7c9650833d152ba044ea",
       "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8bfdbff0_d89f51ef",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1002108
+      },
+      "writtenOn": "2023-03-01T22:05:28Z",
+      "side": 1,
+      "message": "jjb-deploy nonrtric-plt-dmaapadapter-maven-clm-master",
+      "revId": "67ea46203ac600ea4dec7c9650833d152ba044ea",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
     }
   ],
   "submitRequirementResults": []
