@@ -1,0 +1,8 @@
+Verified+1: ORAN Jobbuilder <releng+oran-jobbuilder@linuxfoundation.org>
+Code-Review+1: Kevin Timoney <kevin.timoney@est.tech>
+Code-Review+2: Patrik Buhr <patrik.buhr@est.tech>
+Submitted-by: Patrik Buhr <patrik.buhr@est.tech>
+Submitted-at: Tue, 21 Mar 2023 10:05:55 +0000
+Reviewed-on: https://gerrit.o-ran-sc.org/r/c/nonrtric/plt/dmaapadapter/+/10749
+Project: nonrtric/plt/dmaapadapter
+Branch: refs/heads/master
