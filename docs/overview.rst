@@ -182,7 +182,7 @@ This schema will be registered when the configured dataType is "pmData".
 This will extend the filtering capabilities so that a special filter for PM data can be used. Here it is possible to
 define which meas-types (counters) to get from which resources.
 
-"It is possible to both filter on new data that is collected from the traffical nodes and to query from data that is already collected.
+"It is possible to both filter on new data that is collected from the traffic-handling nodes and to query from data that is already collected.
 
 The filterType parameter is extended to allow value "pmdata" which can be used for PM data filtering.
 
@@ -197,7 +197,7 @@ The filterType parameter is extended to allow value "pmdata" which can be used f
   Example, for a distinguished name "ManagedElement=RNC-Gbg-1,ENodeBFunction=1", the MO class will be "ENodeBFunction".
 * pmRopStartTime gives a possibility to query from already collected PM files. The start file is the time from when the information shall be returned.
   In this case, the query is only done for files from the given "sourceNames".
-  If this parameter is excluded, only "new" reports will be delivered as they are collected from the traffical nodes.
+  If this parameter is excluded, only "new" reports will be delivered as they are collected from the traffic-handling nodes.
 
 All PM filter properties are optional and a non given will result in "match all" (except the pmRopStartTime).
 
@@ -231,7 +231,7 @@ Below follows an example of a PM filter.
 
 
 Here is an example of a filter that will
-match two counters from all cells in two traffical nodes.
+match two counters from all cells in two traffic-handling nodes.
 
 .. code-block:: javascript
 
