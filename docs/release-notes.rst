@@ -1,6 +1,6 @@
 .. This work is licensed under a Creative Commons Attribution 4.0 International License.
 .. http://creativecommons.org/licenses/by/4.0
-.. Copyright (C) 2021 Nordix
+.. Copyright (C) 2021-2033 Nordix
 
 =============
 Release-Notes
@@ -9,8 +9,8 @@ Release-Notes
 
 This document provides the release notes for the release of the DMaaP Adapter.
 
-Version history DMaaP Adater
-============================
+Version history DMaaP Adapter
+=============================
 
 +------------+----------+------------------+-----------------+
 | **Date**   | **Ver.** | **Author**       | **Comment**     |
@@ -34,8 +34,11 @@ Version history DMaaP Adater
 | 2022-12-12 | 1.2.0    | Henrik Andersson | G Release       |
 |            |          |                  |                 |
 +------------+----------+------------------+-----------------+
-| 2022-02-13 | 1.2.1    | Yennifer Chacon  | G Maintenance   |
+| 2023-02-13 | 1.2.1    | Yennifer Chacon  | G Maintenance   |
 |            |          |                  | Release         |
++------------+----------+------------------+-----------------+
+| 2023-06-16 | 1.3.0    | John Keeney      | H Release       |
+|            |          |                  |                 |
 +------------+----------+------------------+-----------------+
 
 
@@ -156,7 +159,27 @@ G Maintenance Release
 | **Release date**            | 2023-02-13                                        |
 |                             |                                                   |
 +-----------------------------+---------------------------------------------------+
-| **Purpose of the delivery** | support for shared Kafka topics           .       |
+| **Purpose of the delivery** | support for shared Kafka topics                   |
 |                             |                                                   |
 +-----------------------------+---------------------------------------------------+
 
+H Release
+---------
++-----------------------------+---------------------------------------------------+
+| **Project**                 | Non-RT RIC DMaaP Adapter                          |
+|                             |                                                   |
++-----------------------------+---------------------------------------------------+
+| **Repo/commit-ID**          | nonrtric/plt/dmaapadapter                         |
+|                             | 890a4fdf7e7bcafe4ac9c7c495dc06cc844cfc13          |
+|                             |                                                   |
++-----------------------------+---------------------------------------------------+
+| **Release designation**     | H                                                 |
+|                             |                                                   |
++-----------------------------+---------------------------------------------------+
+| **Release date**            | 2023-06-16                                        |
+|                             |                                                   |
++-----------------------------+---------------------------------------------------+
+| **Purpose of the delivery** | nonrtric-plt-dmaapadapter:1.3.0                   |
+|                             |    Update to Springboot 3 & JDK17                 |
+|                             |                                                   |
++-----------------------------+---------------------------------------------------+
