@@ -2,6 +2,7 @@ tox
 Sphinx
 doc8
 docutils < 0.17
+urllib3~=1.26.15
 setuptools
 six
 sphinx_rtd_theme
@@ -10,4 +11,7 @@ sphinxcontrib-swaggerdoc
 sphinx_bootstrap_theme
 sphinxcontrib-redoc
 lfdocs-conf
+<<<<<<< HEAD   (6963fe Fixing a mistake in readthedocs.yaml)
 urllib3~=1.26.15
+=======
+>>>>>>> CHANGE (f4f612 Docs: Update release notes)
