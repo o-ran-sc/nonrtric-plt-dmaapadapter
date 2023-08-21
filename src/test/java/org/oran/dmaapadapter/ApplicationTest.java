@@ -362,8 +362,7 @@ class ApplicationTest {
         DmaapSimulatorController.addResponse("[\"DmaapResponse11\", \"DmaapResponse22\"]");
         ConsumerController.TestResults consumer = this.consumerController.testResults;
         await().untilAsserted(() -> assertThat(consumer.receivedBodies).hasSize(2));
-        assertThat(consumer.receivedBodies.get(0)).isEqualTo("DmaapResponse11");
-        assertThat(consumer.receivedBodies.get(1)).isEqualTo("DmaapResponse22");
+	assertThat(consumer.receivedBodies).containsExactlyInAnyOrder("DmaapResponse11", "DmaapResponse22");
 
         // Delete the job
         this.icsSimulatorController.deleteJob(JOB_ID, restClient());
