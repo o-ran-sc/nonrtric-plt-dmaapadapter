@@ -1,0 +1,11 @@
+Code-Review+1: Sonia Sangari <sonia.sangari@est.tech>
+Code-Review+1: Aravindhan Ayyanathan <aravindhan.a@est.tech>
+Code-Review+1: Ambrish Singh <ambrish.singh@est.tech>
+Verified+1: ORAN Jobbuilder <releng+oran-jobbuilder@linuxfoundation.org>
+Code-Review+2: John  Keeney <john.keeney@est.tech>
+Verified+1: ORAN Required GHA <releng+oran.required.gha@linuxfoundation.org>
+Submitted-by: John  Keeney <john.keeney@est.tech>
+Submitted-at: Mon, 28 Aug 2023 12:12:22 +0000
+Reviewed-on: https://gerrit.o-ran-sc.org/r/c/nonrtric/plt/dmaapadapter/+/11659
+Project: nonrtric/plt/dmaapadapter
+Branch: refs/heads/master
