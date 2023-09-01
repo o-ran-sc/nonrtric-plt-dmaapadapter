@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "05550675_d8f8ee39",
+        "filename": ".readthedocs.yaml",
+        "patchSetId": 1
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1000103
+      },
+      "writtenOn": "2023-09-01T14:03:34Z",
+      "side": 1,
+      "message": "Would \"os: ubuntu-22.04\" be better?\nMore future proof \n(But then python 3.7 isn\u0027t very future proof :-) ) \n\nRef: https://docs.readthedocs.io/en/latest/config-file/v2.html#build-os",
+      "range": {
+        "startLine": 25,
+        "startChar": 3,
+        "endLine": 25,
+        "endChar": 18
+      },
+      "revId": "5c6a949da0c34aef7578aa2a8bf137649630e3a1",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    }
+  ]
+}
