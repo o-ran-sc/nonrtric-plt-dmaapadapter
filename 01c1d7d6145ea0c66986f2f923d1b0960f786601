@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6f2ccc86_63fd0a8d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000103
+      },
+      "writtenOn": "2024-03-28T16:07:15Z",
+      "side": 1,
+      "message": "Change proposed by Gururajarao Bandalakunta \u003cGB00566633@TechMahindra.com\u003e\nRef NONRTRIC-996",
+      "revId": "01c1d7d6145ea0c66986f2f923d1b0960f786601",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    }
+  ]
+}
