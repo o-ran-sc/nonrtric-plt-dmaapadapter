@@ -16,6 +16,75 @@
       "message": "Change proposed by Gururajarao Bandalakunta \u003cGB00566633@TechMahindra.com\u003e\nRef NONRTRIC-996",
       "revId": "01c1d7d6145ea0c66986f2f923d1b0960f786601",
       "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "73770918_b211ae43",
+        "filename": "src/main/java/org/oran/dmaapadapter/tasks/JobDataDistributor.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 89,
+      "author": {
+        "id": 1001877
+      },
+      "writtenOn": "2024-03-28T16:44:59Z",
+      "side": 1,
+      "message": "Retry.fixedDelay(3,Duration.ofSeconds(5)) ?",
+      "range": {
+        "startLine": 89,
+        "startChar": 43,
+        "endLine": 89,
+        "endChar": 97
+      },
+      "revId": "01c1d7d6145ea0c66986f2f923d1b0960f786601",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "45f45fb9_a53d4d52",
+        "filename": "src/main/java/org/oran/dmaapadapter/tasks/JobDataDistributor.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 1001877
+      },
+      "writtenOn": "2024-03-28T16:44:59Z",
+      "side": 1,
+      "message": "Can be removed if Retry.fixedDelay suits.",
+      "range": {
+        "startLine": 131,
+        "startChar": 17,
+        "endLine": 131,
+        "endChar": 31
+      },
+      "revId": "01c1d7d6145ea0c66986f2f923d1b0960f786601",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c6f90c67_9e4d47b0",
+        "filename": "src/main/java/org/oran/dmaapadapter/tasks/JobDataDistributor.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 1001877
+      },
+      "writtenOn": "2024-03-28T16:44:59Z",
+      "side": 1,
+      "message": "This is a sonar code smell (logger can be used to record the error).",
+      "range": {
+        "startLine": 137,
+        "startChar": 23,
+        "endLine": 137,
+        "endChar": 44
+      },
+      "revId": "01c1d7d6145ea0c66986f2f923d1b0960f786601",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
     }
   ]
 }
