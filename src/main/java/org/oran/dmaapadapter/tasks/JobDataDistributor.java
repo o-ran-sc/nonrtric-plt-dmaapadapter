@@ -85,9 +85,12 @@ public abstract class JobDataDistributor {
     public void start(Flux<TopicListener.DataFromTopic> input) {
         logger.debug("Starting distribution, to topic: {}", jobGroup.getId());
         PmReportFilter filter = getPmReportFilter(this.jobGroup);
+        final reactor.util.retry.RetrySpec retry =
+                        reactor.util.retry.Retry.max(3).doBeforeRetry(output -> introduceDelay());
         if (filter == null || filter.getFilterData().getPmRopEndTime() == null) {
             this.subscription = filterAndBuffer(input, this.jobGroup) //
-                    .flatMap(this::sendToClient) //
+                    .doOnNext(filtered -> logger.debug("received data"))
+                    .flatMap(filtered -> this.sendToClient(filtered).retryWhen(retry)) //                                                    //
                     .onErrorResume(this::handleError) //
                     .subscribe(this::handleSentOk, //
                             this::handleExceptionInStream, //
@@ -117,11 +120,22 @@ public abstract class JobDataDistributor {
                             dataStore), 100)
                     .map(jobGroup::filter) //
                     .map(this::gzip) //
-                    .flatMap(this::sendToClient, 1) //
+                    .flatMap(filtered -> this.sendToClient(filtered).retryWhen(retry), 1) //
                     .onErrorResume(this::handleCollectHistoricalDataError) //
                     .doFinally(sig -> sendLastStoredRecord()) //
                     .subscribe();
         }
+    }
+
+
+    private void introduceDelay() {
+        try {
+                logger.debug("Waiting 5 sec before retry");
+                        Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                }
     }
 
     private void sendLastStoredRecord() {
