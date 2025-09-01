@@ -1,4 +1,13 @@
-# O-RAN-SC Non-RealTime RIC DMaaP Information Producer
+# O-RAN-SC Non-RealTime RIC DMaaP Information Producer  (Experimental O-RAN-SC Module)
+
+
+![Status: Not for Production](https://img.shields.io/badge/status-not--for--production-red)
+![Status: Experimental](https://img.shields.io/badge/CVE%20Support-none-lightgrey)
+
+> [!WARNING]
+> This repository is pre-spec and not intended for production use. No CVE remediation or production guarantees apply.
+
+
 This product is a generic information producer (as defined by the Information Coordinator Service (ICS)). It can produce any information that can be retrieved from DMaaP or Kafka. Its main tasks is to register information types and itself as a producer using the ICS Data Producer API.
 
 A data consumer may create information jobs through the ICS Data Producer API.
