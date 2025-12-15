@@ -1,5 +1,23 @@
 {
-  "comments": [],
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d768f7d1_fc0e754e",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000103
+      },
+      "writtenOn": "2025-12-15T15:40:21Z",
+      "side": 1,
+      "message": "Will not re-release. No significant functional change since last release. \nThis change only affects devs doing new builds. \nExisting images still works OK. (even if very old)",
+      "revId": "e4f150307580d30f03e74bb23d02adf3dbfb5d67",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    }
+  ],
   "submitRequirementResults": [
     {
       "submitRequirement": {
