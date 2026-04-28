@@ -12,4 +12,5 @@ Non-RT RIC DMaaP Adapter
    ./overview.rst
    ./developer-guide.rst
    ./api-docs.rst
+   ./dmaap-adapter-api.rst
    ./release-notes.rst

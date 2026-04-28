@@ -22,7 +22,8 @@ DMaaP Adapter
 
 The DMaaP Adapter provides support for push delivery of any data received from DMaaP or Kafka.
 
-See `DMaaP Adapter API <./dmaap-adapter-api.html>`_ for full details of the API.
+See :doc:`dmaap-adapter-api` for full details of the API rendered
+inline from the OpenAPI specification.
 
 The API is also described in Swagger-JSON and YAML:
 
