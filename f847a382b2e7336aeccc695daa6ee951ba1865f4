@@ -16,6 +16,23 @@
       "message": "recheck",
       "revId": "f847a382b2e7336aeccc695daa6ee951ba1865f4",
       "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "babed305_9702c281",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000103
+      },
+      "writtenOn": "2026-05-07T14:49:41Z",
+      "side": 1,
+      "message": "ORAN Required GHA vote needs to be overridden, or change merged with child review https://gerrit.o-ran-sc.org/r/c/nonrtric/plt/dmaapadapter/+/15629/1",
+      "revId": "f847a382b2e7336aeccc695daa6ee951ba1865f4",
+      "serverId": "84e4e190-e623-4c37-9eda-58b1937c1b53"
     }
   ]
 }
