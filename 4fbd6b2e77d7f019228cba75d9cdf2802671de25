@@ -1,0 +1,10 @@
+Code-Review+2: John Keeney <john.keeney@est.tech>
+Verified+1: ORAN Jobbuilder <releng+oran-jobbuilder@linuxfoundation.org>
+Code-Review+2: Saul Gill <saul.gill@est.tech>
+Verified+1: ORAN Required GHA <releng+oran.required.gha@linuxfoundation.org>
+Submitted-by: John Keeney <john.keeney@est.tech>
+Submitted-at: Fri, 29 May 2026 12:46:35 +0000
+Reviewed-on: https://gerrit.o-ran-sc.org/r/c/nonrtric/plt/dmaapadapter/+/15648
+Comments-Total: 3
+Project: nonrtric/plt/dmaapadapter
+Branch: refs/heads/master
